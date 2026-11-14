@@ -106,5 +106,31 @@
     "palabras": "<b style='color:#40a8ff'>Celeste</b>: el eco del radar se apagó fuerte (3 dB o más) respecto de fines de agosto. Las fotos satelitales de NASA confirman agua en el 87 % de estas zonas."
    }
   }
- ]
+ ],
+ "_en": {
+  ".satelite": "NISAR (NASA-ISRO), L-band radar, PROVISIONAL GCOV product (HH+HV, 20 m)",
+  ".pares": "Orbit 111 descending, frame 102: 9 passes",
+  ".nombre": "Paraná and Paraguay flood in Chaco",
+  ".lugar": "Greater Resistencia: Isla del Cerrito, Barranqueras and Puerto Vilelas (Chaco, Argentina)",
+  ".titular": "During El Niño, heavy rain raised the Paraná and the Paraguay, and NISAR saw the water flow into the islands even under clouds",
+  ".que_es": "These are the real NISAR radar passes between June and October 2026, one every 12 days. Move the timeline: until October 7 the islands look green; on October 19, with the river at about 7 meters in Barranqueras, the low parts of the islands fill with black (water).",
+  ".estado_detalle": "We ran a blind test: we set the rule before looking at the data. Two different NISAR passes (October 16 and 19, from two orbits) flagged new water, and the NASA water map made from other satellites' images confirms it: in the flagged areas water went from 13% (August) to 87% (October 19); in the areas with no change, from 7% to 8%. The two passes also agree: 97% of what NISAR flagged on October 16 was flagged again on the 19th.",
+  ".resultado": "src/agua_crecida_chaco.py (same recipe as src/agua_crecida_uruguay.py): FLAGGED = HV drop ≥ 3 dB from the reference, 100 m cells. 111 D (ref Aug 20 + Sep 1, event Oct 19): DSWx-HLS 13.0% → 87.4% in flagged, 6.6% → 7.9% in control, temporal control 496/16,181. 060 A (ref Aug 17 + Aug 29, event Oct 16): 26.4% → 79.5% and 10.0% → 12.0%, temporal control 752/7,898.",
+  ".evento": "Paraná and Paraguay river flood, October 2026, during El Niño (heavy rain in the basin). Paraná at Barranqueras: 5.40 m on Oct 14 and 7.16 m on Oct 20 (evacuation from 6.50 m, Coast Guard). Chaco reported 913 people relocated and 281 self-evacuated (Oct 21).",
+  ".limites[0]": "We say 'during El Niño', not 'because of El Niño': NISAR sees the water, not the cause.",
+  ".limites[1]": "NISAR measures in 100 m cells: it sees flooded islands and wetlands, not a street or a house.",
+  ".limites[2]": "The confirmation comes from satellite images (DSWx-HLS) with a single clear date before the flood (August 23); the NASA map made with another radar (Sentinel-1) did not cover the area on the peak dates.",
+  ".limites[3]": "Water under forest or tall grass may not be visible.",
+  ".limites[4]": "Some light-blue patches to the north (near Las Palmas) fall on irrigated rice fields: there the water belongs to the crop, not the flood.",
+  ".capas[0].nombre": "NISAR's eyes",
+  ".capas[0].leyenda.titulo": "NISAR's eyes: the radar echo (false colors)",
+  ".capas[0].leyenda.izq": "no echo (water)",
+  ".capas[0].leyenda.der": "strong echo",
+  ".capas[0].leyenda.palabras": "<b>Black</b>: still water, which acts as a mirror.<br><b>Yellow-green</b>: vegetation.<br><b>Pink or white</b>: towns and buildings.<br>This is the real radar image, not a photo: it has no clouds.",
+  ".capas[0].texto_fecha": "{f}: how the radar saw this place that day. Black = water.",
+  ".capas[1].nombre": "New water (Oct 19)",
+  ".capas[1].texto_fecha": "{f}: in light blue, the areas where NISAR saw the echo drop sharply compared with late August (only computed for October 19).",
+  ".capas[1].leyenda.titulo": "New water according to NISAR (October 19)",
+  ".capas[1].leyenda.palabras": "<b style='color:#40a8ff'>Light blue</b>: the radar echo dropped sharply (3 dB or more) compared with late August. NASA satellite images confirm water in 87% of these areas."
+ }
 }

@@ -1,5 +1,5 @@
 {
- "_nota": "Lista de puntos que muestra el visor. Solo entran puntos VERIFICADOS o VALIDADOS. Cada punto vive en puntos/<id>/punto.json, generado por su script de export. El desmonte de Chaco se quitó el 2026-10-14 (datos en puntos/chaco_desmonte). 'chaco' (2026-10-23) es otra cosa: la crecida del Paraná/Paraguay en el Gran Resistencia, VALIDADA (src/agua_crecida_chaco.py).",
+ "_nota": "Lista de puntos que muestra el visor. Solo entran puntos VERIFICADOS o VALIDADOS. Cada punto vive en puntos/<id>/punto.json, generado por su script de export.",
  "puntos": [
   "la_guaira",
   "delta_parana",

@@ -489,8 +489,8 @@
 
 <script>
   const CFG = window.LANDSENSE_CONFIG || {};
-  /* idioma. ?lang=en muestra en ingles la portada, el modo de 90 segundos, Explorar (globo, tarjetas, leyenda) y las fuentes.
-     Los recorridos completos y las fichas de las escenas siguen en castellano (salen de punto.json). */
+  /* idioma. ?lang=en muestra toda la pagina en ingles: portada, los tres recorridos, el modo de 90 segundos,
+     Explorar y las fichas de las escenas (cada punto.json trae sus textos en ingles en "_en"). */
   const EN = new URLSearchParams(location.search).get("lang") === "en";
   const T = (es, en) => EN ? en : es;
   if (EN) document.documentElement.lang = "en";
@@ -709,7 +709,7 @@
       capaPob = viewer.imageryLayers.addImageryProvider(prov);
       capaPob.show = false; capaPob.alpha = 0.85;
       capaPob.magnificationFilter = Cesium.TextureMagnificationFilter.NEAREST;
-      txt("pobTxt", P.texto + " Es exposición cerca de la ruptura, no un conteo de afectados.");
+      txt("pobTxt", P.texto + T(" Es exposición cerca de la ruptura, no un conteo de afectados.", " It is exposure near the rupture, not a count of people affected."));
     }
     const D = punto.danio;
     ["filaDanio", "danioTxt"].forEach(i => $(i).hidden = !D);
@@ -723,7 +723,8 @@
       capaDanio.magnificationFilter = Cesium.TextureMagnificationFilter.NEAREST;
       txt("danioTxt", D.texto + " " + D.validacion);
       const COL = {complete: "#111111", significant: "#2166ac", minimal: "#67a9cf"};
-      const NOMBRE = {complete: "Derrumbe completo", significant: "Daño importante", minimal: "Daño menor"};
+      const NOMBRE = EN ? {complete: "Complete collapse", significant: "Major damage", minimal: "Minor damage"}
+                         : {complete: "Derrumbe completo", significant: "Daño importante", minimal: "Daño menor"};
       (D.campo?.puntos || []).forEach(q => {
         const e = viewer.entities.add({
           position: Cesium.Cartesian3.fromDegrees(q.lon, q.lat),
@@ -732,7 +733,8 @@
                   heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY},
           show: false});
         e._orden = q.lon;
-        datosEnt.set(e.id, {tipo: "tip", texto: `${NOMBRE[q.cat] || "Daño"}, constatado por voluntarios en el terreno (HOT). La imagen de fondo es de otra fecha y no muestra el daño.`});
+        datosEnt.set(e.id, {tipo: "tip", texto: T(`${NOMBRE[q.cat] || "Daño"}, constatado por voluntarios en el terreno (HOT). La imagen de fondo es de otra fecha y no muestra el daño.`,
+                                                    `${NOMBRE[q.cat] || "Damage"}, confirmed by volunteers on the ground (HOT). The background image is from another date and does not show the damage.`)});
         entCampo.push(e);
       });
       entCampo.sort((a, b) => a._orden - b._orden);         // en el recorrido aparecen de oeste a este
@@ -742,26 +744,28 @@
     txt("titular", punto.titular || punto.nombre); txt("queEs", punto.que_es);
     const color = punto.color || ESTADO_COLOR[punto.estado] || "amarillo";
     const est = $("estado");
-    est.textContent = {VERIFICADO: "Verificado", VALIDADO: "Validado"}[punto.estado] || punto.estado;
+    est.textContent = {VERIFICADO: T("Verificado", "Verified"), VALIDADO: T("Validado", "Validated")}[punto.estado] || punto.estado;
     est.style.setProperty("--c", SEM[color].css);
     txt("estadoDet", punto.estado_detalle); txt("resultado", punto.resultado);
     dibujarGrafico(punto.grafico);
     txt("fAntes", punto.fecha_antes); txt("fDespues", punto.fecha_despues);
 
     const lims = [...punto.limites,
-      "La imagen satelital de fondo es de otra fecha: no muestra lo que midió el radar. Los datos son solo las capas de color."];
+      T("La imagen satelital de fondo es de otra fecha: no muestra lo que midió el radar. Los datos son solo las capas de color.",
+        "The background satellite image is from another date: it does not show what the radar measured. The data are only the color layers.")];
     if (punto.poblacion) lims.push(...punto.poblacion.limites);
     if (punto.danio) lims.push(...punto.danio.limites);
     if (punto.flechas) lims.push(punto.flechas.nota);
     if (punto.falla) lims.push(punto.falla.nota);
     (punto.epicentros || []).filter(e => !e.dentro).forEach(e =>
-      lims.push(`El sismo M${num(e.mag)} (${e.lugar}, según USGS) ocurrió fuera de la zona que medimos en detalle: se marca su epicentro, pero el mapa de colores no llega hasta ahí.`));
+      lims.push(T(`El sismo M${num(e.mag)} (${e.lugar}, según USGS) ocurrió fuera de la zona que medimos en detalle: se marca su epicentro, pero el mapa de colores no llega hasta ahí.`,
+                  `The M${num(e.mag)} earthquake (${e.lugar}, according to USGS) happened outside the area we measured in detail: its epicenter is marked, but the color map does not reach that far.`)));
     $("limites").innerHTML = lims.map(t => `<li>${t}</li>`).join("");
     const fuentes = [`${punto.satelite}. ${punto.pares}. ${punto.evento}.`];
-    if (punto.epicentros) fuentes.push("Epicentros: catálogo USGS (" + punto.epicentros.map(e => e.id).join(", ") + ").");
+    if (punto.epicentros) fuentes.push(T("Epicentros: catálogo USGS (", "Epicenters: USGS catalog (") + punto.epicentros.map(e => e.id).join(", ") + ").");
     if (punto.falla) fuentes.push(punto.falla.fuente);
-    if (punto.poblacion) fuentes.push("Población: " + punto.poblacion.fuente + ".");
-    if (punto.danio) fuentes.push("Zonas de derrumbe: " + punto.danio.fuente, punto.danio.campo?.fuente || "");
+    if (punto.poblacion) fuentes.push(T("Población: ", "Population: ") + punto.poblacion.fuente + ".");
+    if (punto.danio) fuentes.push(T("Zonas de derrumbe: ", "Collapse zones: ") + punto.danio.fuente, punto.danio.campo?.fuente || "");
     $("fuente").innerHTML = fuentes.map(f => `${f}<br>`).join("");
 
     const cont = $("capas"); cont.innerHTML = "";
@@ -801,7 +805,7 @@
       svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#d9ddd6"/>` +
              `<text x="${m.l - 4}" y="${Y(v) + 3.5}" font-size="9" text-anchor="end" fill="#555">${v}%</text>`;
     }
-    [["20260701", "jul"], ["20260801", "ago"], ["20260901", "sep"]].forEach(([f, t]) => {
+    [["20260701", T("jul", "Jul")], ["20260801", T("ago", "Aug")], ["20260901", T("sep", "Sep")]].forEach(([f, t]) => {
       svg += `<line x1="${X(f)}" x2="${X(f)}" y1="${H - m.b}" y2="${H - m.b + 4}" stroke="#999"/>` +
              `<text x="${X(f)}" y="${H - 6}" font-size="9" text-anchor="middle" fill="#555">${t}</text>`;
     });
@@ -812,9 +816,9 @@
     });
     svg += `<line class="grafCursor" y1="${m.t}" y2="${H - m.b}" stroke="#111" stroke-width="1.5" opacity=".7"/></svg>`;
     cont.innerHTML = `<p class="gtit">${G.titulo}</p>${svg}` +
-      `<div class="gley"><span><i style="background:#2166ac"></i>zonas que marcó NISAR</span>` +
-      `<span><i style="background:#8a8a8a"></i>zonas sin cambio</span>` +
-      `<span><i style="background:#111"></i>pasada que estás viendo</span></div>` +
+      `<div class="gley"><span><i style="background:#2166ac"></i>${T("zonas que marcó NISAR", "areas NISAR flagged")}</span>` +
+      `<span><i style="background:#8a8a8a"></i>${T("zonas sin cambio", "areas with no change")}</span>` +
+      `<span><i style="background:#111"></i>${T("pasada que estás viendo", "pass you are viewing")}</span></div>` +
       `<p class="gnota">${G.nota}</p>`;
   }
   function moverCursor(){
@@ -827,21 +831,23 @@
     iFecha = i;
     $("serieFecha").value = i;
     const c = punto.capas.find(x => x.id === capaActiva);
-    const f = punto.fechas_texto[i];
+    const f = F(punto.fechas_texto[i]);
     if (c && c.texto_fecha) txt("serieTxt", c.texto_fecha.replace("{f}", f));
     else txt("serieTxt", capaActiva === "cambio"
-      ? `${f} (pasada ${i + 1} de ${punto.fechas.length}): cuánto cambió el eco respecto de ${punto.fecha_referencia}.`
-      : `${f} (pasada ${i + 1} de ${punto.fechas.length}): el eco que recibió el radar ese día.`);
+      ? T(`${f} (pasada ${i + 1} de ${punto.fechas.length}): cuánto cambió el eco respecto de ${punto.fecha_referencia}.`,
+          `${f} (pass ${i + 1} of ${punto.fechas.length}): how much the echo changed compared with ${punto.fecha_referencia}.`)
+      : T(`${f} (pasada ${i + 1} de ${punto.fechas.length}): el eco que recibió el radar ese día.`,
+          `${f} (pass ${i + 1} of ${punto.fechas.length}): the echo the radar received that day.`));
     if ($("subt")) txt("subt", $("serieTxt").textContent);
     moverCursor(); actualizarVisibles(); actualizarLeyenda();
   }
   function pararSerie(){
     if (reproduciendo){ clearInterval(reproduciendo); reproduciendo = null; }
-    $("btnPlay").textContent = "Reproducir";
+    $("btnPlay").textContent = T("Reproducir", "Play");
   }
   function alternarSerie(){
     if (reproduciendo){ pararSerie(); return; }
-    $("btnPlay").textContent = "Pausa";
+    $("btnPlay").textContent = T("Pausa", "Pause");
     if (iFecha >= punto.fechas.length - 1) ponerFecha(0);
     reproduciendo = setInterval(() => {
       if (iFecha >= punto.fechas.length - 1){ pararSerie(); return; }
@@ -867,7 +873,7 @@
       point: {pixelSize: 14, color: Cesium.Color.fromCssColorString("#E0301E"), outlineColor: Cesium.Color.WHITE,
               outlineWidth: 3, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
               disableDepthTestDistance: Number.POSITIVE_INFINITY},
-      label: etiqueta(`Epicentro M${num(e.mag)} (USGS)`)})));
+      label: etiqueta(`${T("Epicentro", "Epicenter")} M${num(e.mag)} (USGS)`)})));
   }
   function dibujarFalla(){
     if (!punto.falla) return;
@@ -982,17 +988,17 @@
   function ponerMomento(m){
     momento = m;
     document.querySelectorAll("#momento button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === m));
-    const fa = punto.fecha_antes || "la primera pasada del radar", fd = punto.fecha_despues || "la segunda pasada";
+    const fa = punto.fecha_antes || T("la primera pasada del radar", "the first radar pass"), fd = punto.fecha_despues || T("la segunda pasada", "the second pass");
     const cm = punto.capas.find(x => x.id === capaActiva) || {};
     txt("momentoTxt", cm.momentos ? (m === "antes" ? cm.texto_antes : cm.texto_despues) : m === "antes"
-      ? `Antes del sismo (${fa}): el punto de partida. Todavía no hay movimiento que mostrar.`
-      : `Después (${fd}): cuánto se movió el suelo respecto de ${fa}.`);
+      ? T(`Antes del sismo (${fa}): el punto de partida. Todavía no hay movimiento que mostrar.`, `Before the earthquake (${fa}): the starting point. There is no motion to show yet.`)
+      : T(`Después (${fd}): cuánto se movió el suelo respecto de ${fa}.`, `After (${fd}): how much the ground moved compared with ${fa}.`));
     if ($("subt")) txt("subt", $("momentoTxt").textContent);
     actualizarVisibles(); actualizarLeyenda();
   }
   function fechaArchivo(n){
     const m = (n || "").match(/(\d{4})(\d{2})(\d{2})/);
-    return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00Z`).toLocaleDateString("es-AR", {day: "numeric", month: "long", year: "numeric"}) : "";
+    return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00Z`).toLocaleDateString(EN ? "en-US" : "es-AR", {day: "numeric", month: "long", year: "numeric"}) : "";
   }
   function activarCapa(id){
     if (!punto) return;
@@ -1030,7 +1036,7 @@
     comparando = typeof forzar === "boolean" ? forzar : !comparando;
     $("corte").hidden = !comparando;
     viewer.scene.splitPosition = 0.5; ubicarCorte();
-    [$("btnComparar"), $("btnComparar2")].forEach(b => b.textContent = comparando ? "Salir de la comparación" : "Comparar deslizando");
+    [$("btnComparar"), $("btnComparar2")].forEach(b => b.textContent = comparando ? T("Salir de la comparación", "Exit comparison") : T("Comparar deslizando", "Swipe to compare"));
     actualizarVisibles();
   }
   function ubicarCorte(){ $("corte").style.left = (viewer.scene.splitPosition * 100) + "%"; redibujar(); }
@@ -1066,33 +1072,35 @@
       txt("leyTitulo", c.leyenda.titulo);
       $("barraColor").style.background = c.leyenda.gradiente;
       txt("extIzq", c.leyenda.izq); txt("extDer", c.leyenda.der);
-      $("leyPalabras").innerHTML = c.leyenda.palabras + (c.id === "ojos" ? `<div class="solo-experto" style="margin-top:6px">Colores: <b>rojo</b> = HH (superficies, edificios), <b>verde</b> = HV (vegetación), <b>azul</b> = cociente HH/HV.</div>` : "");
+      $("leyPalabras").innerHTML = c.leyenda.palabras + (c.id === "ojos" ? `<div class="solo-experto" style="margin-top:6px">${T("Colores: <b>rojo</b> = HH (superficies, edificios), <b>verde</b> = HV (vegetación), <b>azul</b> = cociente HH/HV.", "Colors: <b>red</b> = HH (surfaces, buildings), <b>green</b> = HV (vegetation), <b>blue</b> = HH/HV ratio.")}</div>` : "");
     } else {
       $("barraColor").style.background = "";
       $("leyenda").style.opacity = momento === "antes" ? 0.55 : 1;   // capas de movimiento: antes no hay dato
-      txt("leyTitulo", `Cuánto se movió el suelo: ${c.nombre.toLowerCase()} (cm)`);
+      txt("leyTitulo", T(`Cuánto se movió el suelo: ${c.nombre.toLowerCase()} (cm)`, `How much the ground moved: ${c.nombre.toLowerCase()} (cm)`));
       txt("extIzq", `−${e} ${c.izquierda}`); txt("extDer", `+${e} ${c.derecha}`);
       $("leyPalabras").innerHTML =
-        `<b style="color:var(--oeste)">Azul</b>: ${c.texto_izq || c.izquierda}.<br>` +
-        `<b style="color:var(--este)">Rojo</b>: ${c.texto_der || c.derecha}.<br>` +
+        `<b style="color:var(--oeste)">${T("Azul", "Blue")}</b>: ${c.texto_izq || c.izquierda}.<br>` +
+        `<b style="color:var(--este)">${T("Rojo", "Red")}</b>: ${c.texto_der || c.derecha}.<br>` +
         `${c.texto_neutro ? c.texto_neutro.charAt(0).toUpperCase() + c.texto_neutro.slice(1) + "." : ""}`;
     }
     const sim = [];
     const conFalla = $("chkFalla").checked, conFlechas = $("chkFlechas").checked && capaActiva === "este_oeste" && opacidad >= 0.05;
-    if (conFalla && punto.epicentros?.length) sim.push('<span class="sim epi"></span>epicentro (USGS)');
-    if (conFalla && punto.falla) sim.push('<span class="sim falla"></span>falla, trazo aproximado (USGS)');
-    if (conFlechas && punto.flechas) sim.push(`<span class="sim flecha"></span>hacia dónde se movió el suelo (largo ×${punto.flechas.exageracion.toLocaleString("es")})`);
-    if (punto.poblacion && $("chkPob").checked) sim.push('<span class="sim pob"></span>personas donde más se movió (más intenso = más gente)');
-    if (punto.danio && $("chkDanio").checked) sim.push('<span class="sim alta"></span>derrumbe probable: lo ven dos pasadas', '<span class="sim media"></span>derrumbe posible: una sola pasada');
-    if (punto.danio && $("chkCampo").checked) sim.push('<span class="sim campo"></span>daño confirmado en el terreno');
+    if (conFalla && punto.epicentros?.length) sim.push('<span class="sim epi"></span>' + T("epicentro (USGS)", "epicenter (USGS)"));
+    if (conFalla && punto.falla) sim.push('<span class="sim falla"></span>' + T("falla, trazo aproximado (USGS)", "fault, approximate trace (USGS)"));
+    if (conFlechas && punto.flechas) sim.push(`<span class="sim flecha"></span>${T("hacia dónde se movió el suelo (largo", "where the ground moved (length")} ×${punto.flechas.exageracion.toLocaleString(EN ? "en-US" : "es")})`);
+    if (punto.poblacion && $("chkPob").checked) sim.push('<span class="sim pob"></span>' + T("personas donde más se movió (más intenso = más gente)", "people where it moved most (stronger = more people)"));
+    if (punto.danio && $("chkDanio").checked) sim.push('<span class="sim alta"></span>' + T("derrumbe probable: lo ven dos pasadas", "likely collapse: seen by two passes"),
+                                                       '<span class="sim media"></span>' + T("derrumbe posible: una sola pasada", "possible collapse: a single pass"));
+    if (punto.danio && $("chkCampo").checked) sim.push('<span class="sim campo"></span>' + T("daño confirmado en el terreno", "damage confirmed on the ground"));
     $("simbolos").innerHTML = sim.join("<br>");
     $("simbolos").hidden = !sim.length;
     if (version === "chicos" && modo === "recorrido"){          // leyenda con palabras de chicos
-      $("simbolos").innerHTML = $("simbolos").innerHTML.replace("epicentro (USGS)", "donde empezó el terremoto")
-        .replace("falla, trazo aproximado (USGS)", "la falla: donde se tocan las placas").replace(/ \(largo ×[^)]*\)/, "");
-      if (!c.leyenda) txt("leyTitulo", "Cuánto se movió el suelo");
+      $("simbolos").innerHTML = $("simbolos").innerHTML.replace(T("epicentro (USGS)", "epicenter (USGS)"), T("donde empezó el terremoto", "where the earthquake started"))
+        .replace(T("falla, trazo aproximado (USGS)", "fault, approximate trace (USGS)"), T("la falla: donde se tocan las placas", "the fault: where the plates meet"))
+        .replace(/ \((largo|length) ×[^)]*\)/, "");
+      if (!c.leyenda) txt("leyTitulo", T("Cuánto se movió el suelo", "How much the ground moved"));
     }
-    if (opacidad < 0.05){ $("leyEscala").hidden = true; txt("leyTitulo", "Qué ves en el mapa"); }   // capa oculta (recorrido)
+    if (opacidad < 0.05){ $("leyEscala").hidden = true; txt("leyTitulo", T("Qué ves en el mapa", "What you see on the map")); }   // capa oculta (recorrido)
     leyendaEnPanel();
   }
   /* en celular la leyenda flotante no entra: en el recorrido va una version corta dentro del panel */
@@ -1129,13 +1137,13 @@
   function alternarOrbita(){
     if (orbita){ detenerOrbita(); return; }
     const k = punto.camara, centro = objetivo().center;
-    $("btnOrbita").textContent = "Detener giro";
+    $("btnOrbita").textContent = T("Detener giro", "Stop rotating");
     orbita = viewer.clock.onTick.addEventListener(() => viewer.camera.lookAt(centro,
       new Cesium.HeadingPitchRange(viewer.camera.heading + 0.003, Cesium.Math.toRadians(-35), k.distancia_m)) || redibujar());
   }
   function detenerOrbita(){
     if (orbita){ orbita(); orbita = null; viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY); }
-    $("btnOrbita").textContent = "Girar";
+    $("btnOrbita").textContent = T("Girar", "Rotate");
   }
   /* desplazar: gira la camara un poco a la izquierda para que el globo no quede debajo del panel */
   function volarA(lon, lat, alto, seg = 2.6, desplazar = 0.09){
@@ -1189,8 +1197,8 @@
       `<span class="sello" style="--c:${c.css}">${s.estado}</span>` +
       `<p style="margin:0 0 10px">${s.explica}</p>` +
       `<p style="font-size:14px;color:var(--suave);margin:0">${T("Profundidad", "Depth")} ${num(s.prof_km)} km.</p>` +
-      `<div class="solo-experto"><details open><summary>Dato técnico</summary><p>${s.estado_tabla}: ${s.detalle}. Código USGS ${s.id}.</p></details></div>` +
-      (s.escena ? `<button class="btn prim" type="button" style="margin-top:12px" onclick="abrirEscena('${s.escena}')">${T("Ver qué midió NISAR", "See what NISAR measured (in Spanish)")}</button>` : "");
+      `<div class="solo-experto"><details open><summary>${T("Dato técnico", "Technical detail")}</summary><p>${s.estado_tabla}: ${s.detalle}. ${T("Código USGS", "USGS code")} ${s.id}.</p></details></div>` +
+      (s.escena ? `<button class="btn prim" type="button" style="margin-top:12px" onclick="abrirEscena('${s.escena}')">${T("Ver qué midió NISAR", "See what NISAR measured")}</button>` : "");
   }
   function tarjetaAgua(a){
     const c = SEM[a.color];
@@ -1220,11 +1228,18 @@
 
   /* ---------------- recorrido ---------------- */
   const ILUSTRACION = `<div class="ecos">
-    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#3d4f1c"/><g fill="#C8E06A">${[10,26,42,58,74].map(x=>`<circle cx="${x}" cy="34" r="9"/>`).join("")}</g><rect y="48" width="90" height="12" fill="#5b4a2e"/></svg><b>Monte</b>eco fuerte: la señal rebota entre hojas y ramas</figure>
-    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#04090d"/><path d="M0 40 Q22 36 45 40 T90 40" stroke="#14323f" fill="none" stroke-width="2"/></svg><b>Agua quieta</b>espejo: el eco se va para otro lado y se ve negra</figure>
-    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#2b2430"/><g fill="#e9b7d6"><rect x="10" y="20" width="16" height="30"/><rect x="34" y="12" width="20" height="38"/><rect x="62" y="24" width="16" height="26"/></g></svg><b>Ciudad</b>rebote doble pared-suelo: muy brillante</figure>
+    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#3d4f1c"/><g fill="#C8E06A">${[10,26,42,58,74].map(x=>`<circle cx="${x}" cy="34" r="9"/>`).join("")}</g><rect y="48" width="90" height="12" fill="#5b4a2e"/></svg><b>${T("Monte", "Forest")}</b>${T("eco fuerte: la señal rebota entre hojas y ramas", "strong echo: the signal bounces between leaves and branches")}</figure>
+    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#04090d"/><path d="M0 40 Q22 36 45 40 T90 40" stroke="#14323f" fill="none" stroke-width="2"/></svg><b>${T("Agua quieta", "Still water")}</b>${T("espejo: el eco se va para otro lado y se ve negra", "a mirror: the echo goes off elsewhere and it looks black")}</figure>
+    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#2b2430"/><g fill="#e9b7d6"><rect x="10" y="20" width="16" height="30"/><rect x="34" y="12" width="20" height="38"/><rect x="62" y="24" width="16" height="26"/></g></svg><b>${T("Ciudad", "City")}</b>${T("rebote doble pared-suelo: muy brillante", "double bounce wall-ground: very bright")}</figure>
   </div>`;
-  const NO_PUEDE = [
+  const NO_PUEDE = EN ? [
+    ["Earthquakes under the sea", "The radar measures the surface of dry land. Of 41 strong earthquakes (June 17 to November 6), 32 were at sea or very deep: there NISAR has no data, and it says so."],
+    ["Meters of motion next to the fault", "When the ground moves meters in a few days, the fine measurement breaks down (Kumamoto, Japan). That needs another technique."],
+    ["The level of a river", "NISAR sees where there is water, not how many meters it rose. If the river rises without leaving its bed, the radar barely notices."],
+    ["Grass fires", "Burnt grass barely changes the radar echo: in the Delta, 417 fire detections left no distinguishable signal."],
+    ["Patagonian glaciers", "NISAR's ice-velocity product came back empty over Perito Moreno. Today it does not work there."],
+    ["Saying what changed, with the radar alone", "The radar sees that something changed strongly, but land clearing and a flood can look alike. You need to know what was there before."],
+  ] : [
     ["Sismos bajo el mar", "El radar mide la superficie de la tierra firme. De 41 sismos fuertes (17 de junio al 6 de noviembre), 32 fueron en el mar o muy profundos: ahí NISAR no tiene dato y lo dice."],
     ["Metros de movimiento junto a la falla", "Cuando el suelo se mueve metros en pocos días, la medición fina se rompe (Kumamoto, Japón). Para eso hace falta otra técnica."],
     ["El nivel de un río", "NISAR ve dónde hay agua, no cuántos metros subió. Si el río crece sin salirse del cauce, el radar casi no lo nota."],
@@ -1282,7 +1297,7 @@
     if (capaPob) capaPob.alpha = 0.85;
     if (capaDanio) capaDanio.alpha = 0.9;
   }
-  const milES = n => Math.round(n).toLocaleString("es-AR");
+  const milES = n => Math.round(n).toLocaleString(EN ? "en-US" : "es-AR");
   const fechaISO = t => new Date(t).toISOString().slice(0, 10);
 
   const PASOS = [
@@ -1303,7 +1318,7 @@
        await g.animar(6500, e => {
          fechaTope = fechaISO(t0 + (t1 - t0) * e); filtrarGlobal();
          const n = SISMOS.sismos.filter(s => s.fecha <= fechaTope).length;
-         if ($("reloj")) txt("reloj", `${fechaES(fechaTope)} · ${n} ${n === 1 ? "sismo" : "sismos"}`);
+         if ($("reloj")) txt("reloj", `${fechaES(fechaTope)} · ${n} ${n === 1 ? T("sismo", "earthquake") : T("sismos", "earthquakes")}`);
        });
        fechaTope = null; filtrarGlobal();
      }},
@@ -1336,7 +1351,7 @@
        await fundirCapa(g, "ojos", 1500);
        await g.esperar(900);
        viewer.scene.splitPosition = 0.97; alternarComparar(true); viewer.scene.splitPosition = 0.97; ubicarCorte();
-       if ($("subt")) txt("subt", version === "chicos" ? "Arrastra la línea si quieres volver a comparar." : "Arrastrá la línea si querés volver a comparar.");
+       if ($("subt")) txt("subt", EN ? "Drag the line if you want to compare again." : version === "chicos" ? "Arrastra la línea si quieres volver a comparar." : "Arrastrá la línea si querés volver a comparar.");
        await deslizarCorte(g, 0.97, 0.03, 3200);
        await g.esperar(500);
        await deslizarCorte(g, 0.03, 0.5, 1400);
@@ -1363,7 +1378,7 @@
        await g.vuelo; await g.esperar(300);
        await g.animar(2400, e => {
          if (capaPob) capaPob.alpha = 0.85 * e;
-         if ($("contador")) txt("contador", "Unas " + milES(meta * e));
+         if ($("contador")) txt("contador", T("Unas ", "About ") + milES(meta * e));
        });
      }},
 
@@ -1392,7 +1407,8 @@
        alternarComparar(false);
        activarCapa("marcado");
        await fundirCapa(g, "marcado", 1500);
-       if ($("subt")) txt("subt", "En celeste, donde NISAR marcó posible agua nueva el 12 de octubre. En esas zonas, el mapa de agua de NASA hecho con otro radar (Sentinel-1) pasó de 1 % a 53 % de agua.");
+       if ($("subt")) txt("subt", T("En celeste, donde NISAR marcó posible agua nueva el 12 de octubre. En esas zonas, el mapa de agua de NASA hecho con otro radar (Sentinel-1) pasó de 1 % a 53 % de agua.",
+                                  "In light blue, where NISAR flagged possible new water on October 12. In those areas, the NASA water map made with another radar (Sentinel-1) went from 1% to 53% water."));
      }},
 
     /* ---- 4b. El Niño: crecida en Chaco (src/agua_crecida_chaco.py, VALIDADO) ---- */
@@ -1413,7 +1429,8 @@
        alternarComparar(false);
        activarCapa("marcado");
        await fundirCapa(g, "marcado", 1500);
-       if ($("subt")) txt("subt", "En celeste, donde NISAR marcó agua nueva el 19 de octubre: los bajos entre las lomas de las islas se llenaron de agua.");
+       if ($("subt")) txt("subt", T("En celeste, donde NISAR marcó agua nueva el 19 de octubre: los bajos entre las lomas de las islas se llenaron de agua.",
+                                  "In light blue, where NISAR flagged new water on October 19: the low ground between the islands' ridges filled with water."));
      }},
     {cap: "El Niño · crecida en Chaco", titulo: "Entre Barranqueras y Corrientes: dos pasadas, el mismo resultado",
      html: () => `<p>Esta vez hicimos la prueba a ciegas: fijamos la regla antes de mirar los datos. Mirá las islas del Paraná entre Barranqueras y Puerto Vilelas (Chaco) y la ciudad de Corrientes: a la izquierda de la línea, el 21 de junio (la primera pasada); a la derecha, el 19 de octubre. Negro = agua.</p><p class="subt" id="subt"></p><p class="nota" style="--c:var(--verde)">Dos pasadas de NISAR desde dos órbitas distintas (16 y 19 de octubre) marcaron agua nueva en los mismos lugares, y las fotos satelitales de NASA lo confirman: en las zonas marcadas el agua pasó de 13 % a 87 %; en las zonas sin cambio, de 7 % a 8 %.</p>`,
@@ -1432,7 +1449,8 @@
        alternarComparar(false);
        activarCapa("marcado");
        await fundirCapa(g, "marcado", 1500);
-       if ($("subt")) txt("subt", "En celeste, el agua nueva que NISAR marcó el 19 de octubre. NISAR ve islas y bañados inundados; una calle o una casa son demasiado chicas para él.");
+       if ($("subt")) txt("subt", T("En celeste, el agua nueva que NISAR marcó el 19 de octubre. NISAR ve islas y bañados inundados; una calle o una casa son demasiado chicas para él.",
+                                  "In light blue, the new water NISAR flagged on October 19. NISAR sees flooded islands and wetlands; a street or a house is too small for it."));
      }},
 
     /* ---- 5. Limites ---- */
@@ -1445,13 +1463,47 @@
      html: `<p>Todo lo que viste está en el globo, con todas las herramientas: capas, comparar, línea de tiempo, transparencia. Tocá cualquier sismo o crecida para ver qué midió NISAR, y qué no.</p><button class="btn prim" type="button" onclick="ponerModo('explorar')">Explorar el planeta</button>`,
      vista: [-55, -5, 2.4e7], girar: true},
   ];
+  /* textos en ingles del recorrido (mismo orden que PASOS). t0 guarda el titulo original: pasoGeneral busca por el. */
+  PASOS.forEach(p => p.t0 = p.titulo);
+  if (EN) [
+    {cap: "The radar", titulo: "A radar that sees through clouds",
+     html: `<p>NISAR is a satellite from NASA and the Indian Space Research Organisation (ISRO), launched in 2025. It does not take photos: it sends radio pulses and listens to the echo that comes back. That is why it sees at night and under cloud cover.</p>${ILUSTRACION}<p>It passes over the same place every 12 days. By comparing two passes, it knows what changed.</p><div class="solo-experto"><p class="subt"><b>Polarizations.</b> NISAR transmits the wave horizontally (H) and listens to the echo horizontally and vertically (V). <b>HH</b> (out and back horizontal) responds to hard surfaces and to double bounce: walls against the ground, trunks standing in water. <b>HV</b> (comes back rotated) appears when the wave bounces many times between leaves and branches: it is the vegetation channel. Still water acts as a mirror and dims both. For water we use the echo intensity in HH and HV (GCOV product); for ground motion, the phase of the HH wave between two passes (GUNW product).</p></div>`},
+    {cap: "The planet", titulo: "Every strong earthquake since June",
+     html: () => `<p class="reloj" id="reloj">&nbsp;</p><p>${resumenTexto()}</p><p>The color of each dot says how sure we are of what the radar measured there. No color is decoration: it is the result of a test.</p>`},
+    {cap: "Venezuela · the earthquake", titulo: "June 24: two earthquakes 32 seconds apart",
+     html: `<p>According to the USGS catalog, on June 24 there were two earthquakes 32 seconds apart: a magnitude 7.2 near San Felipe and a 7.5 near La Guaira, about 150 km away. Both lie on the same fault, the dotted line running west to east.</p><p class="nota" style="--c:var(--amarillo)">NISAR measured the La Guaira area in detail, and that is what you are about to see. Near San Felipe it also sees the ground cut by the fault, with the two sides moving in opposite directions, as USGS indicates: there it is an indication, we have not verified it yet.</p>`},
+    {cap: "Venezuela · the earthquake", titulo: "June 24: the ground shifted half a meter",
+     html: `<p>Near La Guaira, NISAR compared a pass from before with one from after and measured how much each point of the ground moved.</p><p class="nota" style="--c:var(--verde)">South of Maiquetía airport the ground shifted about <b>56 cm to the west</b>, nearly the length of an arm. NASA/JPL reported up to about 60 cm in the same area.</p><p class="subt">Blue: the ground moved west. Red: east. The arrows show which way.</p>`},
+    {cap: "Venezuela · the earthquake", titulo: "In the radar image, the earthquake is almost invisible",
+     html: `<p>This is how the radar sees La Guaira and Caracas: the echo that comes back from each place, in false colors. Left of the line, before the earthquake; right of it, after.</p><p>To the eye it barely changes. The half meter is not visible in the image: NISAR measures it by comparing its radio wave, about 24 cm long, between two passes.</p><p class="subt" id="subt"></p>`},
+    {cap: "Venezuela · the earthquake", titulo: "Where did buildings collapse?",
+     html: () => { const D = puntos.la_guaira?.danio || {};
+       return `<p>Where a building collapses, the ground stops looking like itself from one pass to the next. NISAR flags those zones of about 250 m: <b style="color:#e8574a">dark red</b> if two orbits see them, <b style="color:#fd8d3c">orange</b> if only one does.</p><p>The dots are what volunteers confirmed on the ground: <b>black</b>, complete collapse; <b style="color:#6fa8dc">blue</b>, major or minor damage.</p><p class="nota" style="--c:var(--verde)">${D.validacion || ""}</p><p class="subt">It flags neighborhoods where collapses are likely, not individual buildings.</p>`; }},
+    {cap: "Venezuela · the earthquake", titulo: "How many people lived where it moved most?",
+     html: () => { const P = puntos.la_guaira?.poblacion || {};
+       return `<p class="cifra"><span id="contador">0</span></p><p>people lived (2020 estimate) where the ground shifted more than ${Math.round(P.umbral_cm || 0)} cm.</p><p class="nota" style="--c:#bd0026">These are people exposed near the rupture, not a count of people affected: damage comes from the shaking. ~1 km cells: it shows areas, not city blocks.</p>`; }},
+    {cap: "Water · floods", titulo: "August, Paraná Delta: water covered the islands",
+     html: `<p>Under cloudy skies, NISAR saw the echo from the low parts of the islands fade (in blue). NASA water maps, made with other satellites, confirmed it was water.</p><div id="grafRec" class="graf"></div><p class="subt" id="subt"></p>`},
+    {cap: "Water · floods", titulo: "October, Uruguay River: a flood as it happened",
+     html: () => `<p>On October 11 NASA's optical satellite could not see the ground: full cloud cover. The radar could. Left of the line, June 26; right of it, October 12. Black = water.</p><p class="subt" id="subt"></p><p class="nota" style="--c:var(--amarillo)">${AGUA[1].ojo}</p>`},
+    {cap: "El Niño · flood in Chaco", titulo: "October, Isla del Cerrito: the river flowed into the islands",
+     html: () => `<p>During El Niño it rained a lot in the basin and the Paraná and Paraguay rivers rose. In Chaco more than a thousand people were evacuated. Look at the islands where the two rivers meet: left of the line, October 7; right of it, October 19, with the river at about 7 meters. Black = water.</p><p>How does it know? The radar listens to the echo on two “channels”. One of them (HV) responds mostly to vegetation: leaves and branches send the wave back rotated. When the river covers the islands, the water acts as a mirror and that echo fades. We flag new water where that channel dropped to half or less.</p><p class="subt" id="subt"></p>`},
+    {cap: "El Niño · flood in Chaco", titulo: "Between Barranqueras and Corrientes: two passes, the same result",
+     html: () => `<p>This time we ran a blind test: we set the rule before looking at the data. Look at the Paraná islands between Barranqueras and Puerto Vilelas (Chaco) and the city of Corrientes: left of the line, June 21 (the first pass); right of it, October 19. Black = water.</p><p class="subt" id="subt"></p><p class="nota" style="--c:var(--verde)">Two NISAR passes from two different orbits (October 16 and 19) flagged new water in the same places, and NASA satellite images confirm it: in the flagged areas water went from 13% to 87%; in the areas with no change, from 7% to 8%.</p>`},
+    {cap: "The limits", titulo: "What NISAR cannot do on its own",
+     html: `<p>Knowing when not to trust it is as important as measuring. We tested these and they did not work:</p><ul class="limites-lista entra">${NO_PUEDE.map(([t, d], i) => `<li style="--i:${i}"><b>${t}</b><span>${d}</span></li>`).join("")}</ul>`},
+    {cap: "Your turn", titulo: "Now explore it yourself",
+     html: `<p>Everything you saw is on the globe, with all the tools: layers, compare, timeline, transparency. Tap any earthquake or flood to see what NISAR measured, and what it did not.</p><button class="btn prim" type="button" onclick="ponerModo('explorar')">Explore the planet</button>`},
+  ].forEach((o, i) => Object.assign(PASOS[i], o));
   /* ================= VERSION PARA CHICOS =================
-     Textos de la versión para chicos (ajustados el 22-oct, pasos 4, 6 y 9). Narra NISAR, en "tú".
+     Textos de la versión para chicos. Narra NISAR, en "tú".
      Reusa escenas y guiones de PASOS; solo cambian textos, pasos y el personaje. apunta: [lon,lat] del haz en pasos sin escena. */
-  const SEM_CHICOS = {verde: "Seguro: otros científicos lo comprobaron", amarillo: "Casi seguro: falta confirmarlo",
+  const SEM_CHICOS = EN ? {verde: "Sure: other scientists checked it", amarillo: "Almost sure: still needs checking",
+    azul: "I haven't passed over there yet", gris: "I can't see it"}
+    : {verde: "Seguro: otros científicos lo comprobaron", amarillo: "Casi seguro: falta confirmarlo",
     azul: "Todavía no pasé por ahí", gris: "No lo puedo ver"};
   /* los pasos de chicos reusan guiones de PASOS por TITULO (no por numero, asi no se corren al agregar pasos) */
-  const pasoGeneral = t => { const p = PASOS.find(x => x.titulo.startsWith(t)); if (!p) throw new Error('paso no encontrado: ' + t); return p; };
+  const pasoGeneral = t => { const p = PASOS.find(x => (x.t0 || x.titulo).startsWith(t)); if (!p) throw new Error('paso no encontrado: ' + t); return p; };
   /* cara de NISAR en cada paso de PASOS_CHICOS (mismo orden) */
   const CARAS_CHICOS = ["contento", "contento", "pensando", "serio", "sorpresa", "contento", "pensando", "contento", "serio", "feliz"];
   const PASOS_CHICOS = [
@@ -1471,8 +1523,8 @@
        col.add({positions: Array.from({length: 13}, (_, k) => Cesium.Cartesian3.fromDegrees(-73 + k, 14.2, 30000)), width: 30,
          material: Cesium.Material.fromType(Cesium.Material.PolylineArrowType, {color: Cesium.Color.fromCssColorString("#C8E06A")})});
        primitivasExtra.push(col);
-       viewer.entities.add({position: Cesium.Cartesian3.fromDegrees(-67, 15.6), label: {...etiqueta("Placa del Caribe → hacia el este"), heightReference: Cesium.HeightReference.NONE}});
-       viewer.entities.add({position: Cesium.Cartesian3.fromDegrees(-64, 6.5), label: {...etiqueta("Placa de Sudamérica"), heightReference: Cesium.HeightReference.NONE}});
+       viewer.entities.add({position: Cesium.Cartesian3.fromDegrees(-67, 15.6), label: {...etiqueta(T("Placa del Caribe → hacia el este", "Caribbean plate → moving east")), heightReference: Cesium.HeightReference.NONE}});
+       viewer.entities.add({position: Cesium.Cartesian3.fromDegrees(-64, 6.5), label: {...etiqueta(T("Placa de Sudamérica", "South American plate")), heightReference: Cesium.HeightReference.NONE}});
        redibujarLuego();
      }},
     {cap: "NISAR te cuenta · 4", titulo: "Lo que pasó el 24 de junio",
@@ -1501,6 +1553,28 @@
      vista: [-55, -5, 2.4e7], girar: true},
   ];
 
+  if (EN) [
+    {cap: "NISAR tells you · 1", titulo: "Hi! I'm NISAR",
+     html: `<p>Hi! I'm NISAR, a satellite. NASA, from the United States, and ISRO, from India, built me together. I was launched into space on July 30, 2025.</p><p>I fly around the Earth 747 kilometers up. My antenna is like a giant umbrella: it is 12 meters wide, about the length of a bus.</p>`},
+    {cap: "NISAR tells you · 2", titulo: "I see with echoes, like a bat",
+     html: `<p>I don't have eyes like a camera. I send radio waves toward the Earth and listen to the echo that comes back, like bats do. That's why I can see at night and even when there are clouds.</p>${ILUSTRACION}<p>Forests send me back a lot of echo. Still water is like a mirror: the echo bounces off somewhere else, so I see it black. And cities shine really bright!</p>`},
+    {cap: "NISAR tells you · 3", titulo: "The Earth is made of pieces that move",
+     html: `<p>The ground you stand on seems still, but it is made of giant pieces, like a jigsaw puzzle. They are called tectonic plates and they move very, very slowly.</p><p>Venezuela sits right where two of those pieces meet: the Caribbean plate and the South American plate. The Caribbean plate moves east about 2 centimeters a year, slower than your fingernails grow.</p><p class="probar"><b>Try this:</b> press the palms of your hands together, hard. Now try to slide one hand forward while you keep pressing. They get stuck… and then suddenly slip. That is what happens between two plates: they stay stuck for many years and one day they suddenly come loose. That jolt is an earthquake.</p><p class="subt">The map is a simple drawing: the arrow is not to scale.</p>`},
+    {cap: "NISAR tells you · 4", titulo: "What happened on June 24",
+     html: `<p>On June 24, 2026, the plates came loose under the coast, near La Guaira. There were two strong earthquakes, one right after the other, in less than a minute.</p><p class="nota" style="--c:var(--verde)">If you lived through it, it's normal to have been scared. Being scared is your body's way of looking after you.</p><p class="subt">The dotted line is the fault, where the plates came loose. The red dot is the epicenter.</p>`},
+    {cap: "NISAR tells you · 5", titulo: "What I measured: the ground shifted",
+     html: `<p>I passed overhead before and after the earthquake, and I compared the two times. That's how I discovered something surprising: near the airport, the ground shifted about <b>56 centimeters to the west</b>. That's about the length of your arm!</p><p>Each arrow shows which way the ground moved. NASA scientists measured almost the same as I did.</p><p class="subt">Blue: the ground moved west. White: it barely moved.</p>`},
+    {cap: "NISAR tells you · 6", titulo: "A trick: you can't see it in the picture",
+     html: `<p>Look at my two images: left of the line, before the earthquake; right of it, after. Can you spot a difference? You can hardly tell!</p><p>I didn't see the motion by “looking”: I measured it. My radio wave is 24 centimeters long and I use it like an invisible ruler. If the ground moves even a tiny bit, my echo comes back a little shifted, and that's how I notice.</p><p class="probar"><b>In short: I have a superpower!</b> I send invisible signals toward the Earth, as if I threw a ball and waited for it to bounce back. But these signals are special: they help me measure the ground very, very precisely. If something moves, even a tiny bit, I can find out!</p><p class="subt" id="subt"></p>`},
+    {cap: "NISAR tells you · 7", titulo: "When I don't know something, I say so",
+     html: () => `<p class="reloj" id="reloj">&nbsp;</p><p>Since June there were ${SISMOS.resumen.total} strong earthquakes on the planet. I give each one a color to say how sure I am:</p><div class="sem" style="margin:0 0 12px">${Object.entries(SEM_CHICOS).map(([k, t]) => `<i style="--c:${SEM[k].css}"></i><span>${t}</span>`).join("")}</div><p>${SISMOS.resumen.gris} of those earthquakes were under the sea or very deep, and my wave can't reach there. Instead of making something up, I say: “I can't measure it”. That is also doing science.</p>`},
+    {cap: "NISAR tells you · 8", titulo: "I can see water too",
+     html: `<p>I don't only see earthquakes. In August 2026, in the Paraná River Delta, in Argentina, water covered parts of the islands. The sky was cloudy, but I saw those areas turn dark like mirrors. NASA water maps, made with other satellites, confirmed it was water.</p><p class="subt">In blue, where my echo faded: that's where the water came.</p><p class="subt" id="subt"></p>`},
+    {cap: "NISAR tells you · 9", titulo: "Nobody knows when: that's why we get ready",
+     html: `<p>One important thing: neither I nor anyone else can <b>know the exact day, time or place where an earthquake will happen.</b></p><p>What we can do is study how the Earth moves, learn about earthquakes and get better prepared.</p><p class="probar"><b>Getting to know our planet is also a way to take care of ourselves!</b></p>`},
+    {cap: "NISAR tells you · 10", titulo: "Would you like to study the Earth?",
+     html: `<p>The people who built me and the ones who study my data were also curious kids like you. They do jobs like these:</p><ul class="oficios"><li>Geologist</li><li>Seismologist</li><li>Space engineer</li><li>Programmer</li><li>Data scientist</li><li>Hydrologist</li></ul><p>If you liked discovering how the Earth moves, maybe one day you'll work with satellites like me!</p><button class="btn prim" type="button" onclick="ponerModo('explorar')">Explore the planet</button>`},
+  ].forEach((o, i) => Object.assign(PASOS_CHICOS[i], o));
   /* ---- version elegida ---- */
   let version = null;
   /* ---- modo cine. Reusa escenas y guiones de PASOS; cambia el texto (un dato, un titular, una linea) y avanza solo.
@@ -1550,7 +1624,7 @@
     {cap: "LandSense", titulo: T("Un radar que dice qué cambió en la Tierra, y qué tan seguro está.", "A radar that tells what changed on Earth, and how sure it is."),
      vista: [-62, -12, 2.2e7], girar: true, fin: true},
   ];
-  const NOMBRE_VERSION = {chicos: "Para chicos", general: "General", detalle: "En detalle"};
+  const NOMBRE_VERSION = EN ? {chicos: "For kids", general: "General", detalle: "In depth"} : {chicos: "Para chicos", general: "General", detalle: "En detalle"};
   const listaPasos = () => version === "chicos" ? PASOS_CHICOS : version === "cine" ? PASOS_CINE : PASOS;
   function abrirSelector(){ $("selector").hidden = false; setTimeout(() => $("opciones").querySelector("button").focus(), 50); }
   function elegirVersion(v){
@@ -1605,7 +1679,7 @@
   function tecnico(P){
     const p = P.escena && puntos[P.escena];
     if (!p || version !== "detalle") return "";
-    return `<details class="tec" open><summary>Dato técnico</summary><p>${p.resultado || ""}</p><p>${p.satelite}. ${p.pares}.</p></details>`;
+    return `<details class="tec" open><summary>${T("Dato técnico", "Technical detail")}</summary><p>${p.resultado || ""}</p><p>${p.satelite}. ${p.pares}.</p></details>`;
   }
   function selloEscena(id){
     const p = puntos[id]; if (!p) return "";
@@ -1621,8 +1695,8 @@
       h += `<i class="${k <= paso ? "hecho" : ""}"></i>`; ant = c;
     });
     $("puntitos").innerHTML = h;
-    txt("pasoN", `${paso + 1} de ${listaPasos().length}`);
-    txt("btnVersion", version ? `${NOMBRE_VERSION[version]} · cambiar` : "");
+    txt("pasoN", `${paso + 1} ${T("de", "of")} ${listaPasos().length}`);
+    txt("btnVersion", version ? `${NOMBRE_VERSION[version]} · ${T("cambiar", "change")}` : "");
   }
 
   async function irPaso(i){
@@ -1637,13 +1711,13 @@
     if (P.escena && !puntos[P.escena]) P = {...P, ...(ALT[P.escena] || {vista: [-55, -5, 2.4e7]}), escena: null, guion: null};
     dibujarProgreso();
     $("btnAnt").disabled = paso === 0;
-    $("btnSig").textContent = paso === LP.length - 1 ? "Explorar" : "Siguiente";
+    $("btnSig").textContent = paso === LP.length - 1 ? T("Explorar", "Explore") : T("Siguiente", "Next");
     $("btnRep").hidden = !P.guion;
     if (version === "cine"){
       const cf = typeof P.cifra === "function" ? P.cifra() : P.cifra;
       $("cap").innerHTML = `<p class="capitulo">${P.cap}${P.escena ? selloEscena(P.escena) : ""}</p>` + (cf ? `<p class="cifra">${cf}</p>` : "") +
         `<h2>${P.titulo}</h2>` + (P.linea ? `<p class="linea">${P.linea}</p>` : "") +
-        (P.fin ? `<div class="acciones"><button class="btn prim" type="button" onclick="abrirSelector()">${T("Recorrido completo", "Full tour (in Spanish)")}</button><button class="btn" type="button" onclick="ponerModo('explorar')">${T("Explorar el planeta", "Explore the planet")}</button></div><p class="fuentes">${fuentesTxt()}</p>` : "");
+        (P.fin ? `<div class="acciones"><button class="btn prim" type="button" onclick="abrirSelector()">${T("Recorrido completo", "Full tour")}</button><button class="btn" type="button" onclick="ponerModo('explorar')">${T("Explorar el planeta", "Explore the planet")}</button></div><p class="fuentes">${fuentesTxt()}</p>` : "");
     } else
     $("cap").innerHTML = `<p class="capitulo">${P.cap}</p><h2>${P.titulo}</h2>` + (P.escena ? selloEscena(P.escena) : "") +
       (typeof P.html === "function" ? P.html() : P.html) + tecnico(P) + `<div id="leyRec"></div>`;
@@ -1744,14 +1818,87 @@
     t.style.left = Math.min(pos.x + 14, innerWidth - 270) + "px"; t.style.top = (pos.y + 14) + "px";
   }
 
+  /* ingles: cada punto.json trae "_en" = {ruta: texto}; se copia encima del texto en castellano. Las fechas se pasan con F(). */
+  function aplicarEN(p){
+    Object.entries(p._en || {}).forEach(([ruta, t]) => {
+      const partes = ruta.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+      let o = p;
+      for (const k of partes.slice(0, -1)){ o = o?.[k]; if (o == null) return; }
+      const k = partes[partes.length - 1];
+      if (o && k in o) o[k] = t;
+    });
+    if (p.fechas_texto) p.fechas_texto = p.fechas_texto.map(F);
+    ["fecha_antes", "fecha_despues", "fecha_referencia"].forEach(k => { if (p[k]) p[k] = F(p[k]); });
+  }
+  /* ingles: textos fijos de la pagina (botones, ficha, selector) */
+  function traducirUI(){
+    const Q = (sel, t, attr) => document.querySelectorAll(sel).forEach(e => attr ? e.setAttribute(attr, t) : e.textContent = t);
+    const H = (sel, h) => document.querySelectorAll(sel).forEach(e => e.innerHTML = h);
+    Q("#marca", "Back to the cover", "title");
+    Q("#btnCalidad", "High-quality map. Turn it off if your phone is slow.", "title");
+    Q("#btnVersion", "Choose another way to tour it", "title");
+    Q("#volver", "Back to the planet");
+    Q("#momTit", "Compare");
+    H('#momento [data-m="antes"]', 'Before<small id="fAntes"></small>');
+    H('#momento [data-m="despues"]', 'After<small id="fDespues"></small>');
+    Q("#btnComparar, #btnComparar2", "Swipe to compare");
+    Q("#grupoSerie > span", "Radar passes");
+    Q("#serieFecha", "Date of the pass", "aria-label");
+    Q("#btnPlay", "Play");
+    Q("#capasTit", "What to look at");
+    Q("#grupoMostrar > span", "Add to the map");
+    [["filaFlechas", "Arrows: which way the ground moved"], ["filaFalla", "Fault and epicenter (USGS)"],
+     ["filaPob", "People who live where it moved most"], ["filaDanio", "Likely collapse zones (radar)"],
+     ["filaCampo", "Damage confirmed by volunteers on the ground"]].forEach(([id, t]) => $(id).lastChild.textContent = " " + t);
+    Q("#ficha > details > summary", "What this measurement cannot tell");
+    Q('label[for="opacidad"]', "Layer transparency");
+    const cam = document.querySelectorAll("#ficha .solo-experto .grupo > span")[1]; if (cam) cam.textContent = "Camera";
+    Q('[data-vista="3d"]', "3D view"); Q('[data-vista="arriba"]', "From above"); Q("#btnOrbita", "Rotate");
+    const sums = document.querySelectorAll("#ficha .solo-experto details > summary");
+    if (sums[0]) sums[0].textContent = "Technical detail"; if (sums[1]) sums[1].textContent = "Sources";
+    Q("#btnAnt", "Back"); Q("#btnSig", "Next");
+    Q("#btnRep", "Watch again", "title"); Q("#btnRep", "Watch again", "aria-label");
+    Q("#corte", "Drag to compare", "aria-label");
+    Q("#salirCine", "Exit (Esc)", "title");
+    Q("#resumen", "Loading earthquakes…");
+    Q("#selector .sub", "All three show real measurements from the NISAR radar. What changes is how they are told.");
+    const OPC = {
+      chicos: ["Ages 8 to 13", "For kids", "NISAR, the satellite, tells you how it looks at the Earth and why it sometimes shakes. To watch in class or with family."],
+      general: ["For everyone", "General", "The full tour: what NISAR measured in earthquakes and floods, and how sure it is of each thing."],
+      detalle: ["With technical data", "In depth", "The same, with technical data: radar products, the date of each pass, methods and sources."]};
+    Object.entries(OPC).forEach(([v, [i, b, sp]]) => {
+      const e = document.querySelector(`#opciones [data-v="${v}"]`); if (!e) return;
+      e.querySelector("i").textContent = i; e.querySelector("b").textContent = b; e.querySelector("span").textContent = sp;
+    });
+    const DET = {
+      "epicentro en mar abierto a mas de 100 km de la costa; sin pares GUNW cerca (ademas, produccion PROVISIONAL en pausa desde 23-oct)": "epicenter in open sea more than 100 km from the coast; no GUNW pairs nearby (also, PROVISIONAL production paused since Oct 23)",
+      "epicentro en el fondo del oceano Pacifico (dorsal al SE de Isla de Pascua); sin pares GUNW cerca": "epicenter on the Pacific Ocean floor (ridge SE of Easter Island); no GUNW pairs nearby",
+      "sin pares GUNW cerca": "no GUNW pairs nearby",
+      "pares existen pero sin pixeles validos cerca del epicentro (agua)": "pairs exist but have no valid pixels near the epicenter (water)",
+      "pares existen pero sin pixeles validos cerca del epicentro (agua); ademas profundo (>30 km)": "pairs exist but have no valid pixels near the epicenter (water); also deep (>30 km)",
+      "pares 040 D / 076 A ya publicados: pendiente de análisis con src/sismo_generico.py (y su deformacion se suma a la de la M7,7)": "pairs 040 D / 076 A already published: analysis with src/sismo_generico.py pending (and its deformation adds to that of the M7.7)",
+      "040 D / 076 A ya publicados: pendiente de análisis con src/sismo_generico.py (su deformacion se suma a la de la M7,7)": "040 D / 076 A already published: analysis with src/sismo_generico.py pending (its deformation adds to that of the M7.7)",
+      "entro al catalogo al actualizar (prof. 31 km); pares 008 A / 016 D publicados: pendiente de análisis con src/sismo_generico.py": "entered the catalog on update (depth 31 km); pairs 008 A / 016 D published: analysis with src/sismo_generico.py pending",
+      "2/3 auto; deformacion CONJUNTA con la M7,7 (mismos pares); C4 no evaluable": "2/3 auto; deformation COMBINED with the M7.7 (same pairs); C4 not assessable",
+      "C1 y C2 pasan (040 D vs 141 D r 0,99); C3 no confiable (076 A con errores de desenrollado); C4: lateral izquierdo y rumbo ~281° = USGS": "C1 and C2 pass (040 D vs 141 D r 0.99); C3 not reliable (076 A with unwrapping errors); C4: left-lateral and strike ~281° = USGS",
+      "1/3 auto; pares de 24-36 d y metros junto a la falla rompen la fase; el sistema no aprueba": "1/3 auto; 24-36 day pairs and meters of motion next to the fault break the phase; the system does not approve",
+      "2/3 auto; coincide con NASA (~56 cm al oeste); derrumbes validados con campo (HOT)": "2/3 auto; agrees with NASA (~56 cm to the west); collapses validated with field data (HOT)",
+      "2/3 auto; traza E-O y sentido dextral = plano nodal USGS 270°/rake -169° (C4 definido tras verlo: indicio)": "2/3 auto; E-W trace and right-lateral sense = USGS nodal plane 270°/rake -169° (C4 defined after seeing it: indication)",
+      "1/3 auto (src/sismo_generico.py --con-ur, pares UR): asc 112 A 23,9x y 040 A ~5x, C2 r 0,93/0,96; desc 163 D sin datos -> C3 y C4 no evaluables; hueco junto a la ruptura = zona sin desenrollar (src/sismo_tibet_chequeo_hueco.py)": "1/3 auto (src/sismo_generico.py --con-ur, UR pairs): asc 112 A 23.9x and 040 A ~5x, C2 r 0.93/0.96; desc 163 D no data -> C3 and C4 not assessable; gap next to the rupture = unwrapped-failure zone (src/sismo_tibet_chequeo_hueco.py)"};
+    const TABLA = {"NO SE PUEDE (mar o profundo)": "CANNOT MEASURE (sea or deep)", "TODAVIA SIN DATO": "NO DATA YET",
+      "VISTO Y VERIFICADO": "SEEN AND VERIFIED", "VISTO, COINCIDE CON USGS": "SEEN, AGREES WITH USGS", "VISTO, SIN VERIFICAR": "SEEN, NOT VERIFIED"};
+    SISMOS.sismos.forEach(x => { x.detalle = DET[x.detalle] || x.detalle; x.estado_tabla = TABLA[x.estado_tabla] || x.estado_tabla; });
+  }
+
   /* ---------------- arranque ---------------- */
   async function iniciar(){
     try { SISMOS = await (await fetch("sismos.json")).json(); }
-    catch(e){ avisar("No se pudo leer sismos.json. Abrí el visor con Live Server desde VS Code (con doble clic el navegador bloquea la lectura de archivos) y corré src/sismos_export_visor.py."); return; }
+    catch(e){ avisar(T("No se pudo leer sismos.json. Abrí el visor con Live Server desde VS Code (con doble clic el navegador bloquea la lectura de archivos) y corré src/sismos_export_visor.py.",
+                       "Could not read sismos.json. Open the viewer with a local server, such as Live Server in VS Code (opened with a double click the browser blocks reading files), and run src/sismos_export_visor.py.")); return; }
     try {
       const lista = await (await fetch("puntos/index.json")).json();
       for (const id of lista.puntos){
-        try { puntos[id] = await (await fetch(`puntos/${id}/punto.json`)).json(); }
+        try { puntos[id] = await (await fetch(`puntos/${id}/punto.json`)).json(); if (EN) aplicarEN(puntos[id]); }
         catch(e){ console.warn("escena sin datos:", id, e); }
       }
     } catch(e){ console.warn("sin puntos/index.json", e); }
@@ -1791,13 +1938,13 @@
       P.querySelector(".bajada").textContent = "NISAR, the NASA and ISRO satellite, sees the ground at night and through clouds. We asked it what changed on Earth since June 2026, and asked it to say when it is sure and when it is not.";
       P.querySelector(".dato").setAttribute("aria-label", "About 56 centimeters");
       $("btnCine").innerHTML = "&#9654; Watch it in 90 seconds";
-      txt("btnEmpezar", "Full tour (in Spanish)"); txt("btnExplorar", "Explore the planet");
+      txt("btnEmpezar", "Full tour"); txt("btnExplorar", "Explore the planet");
       $("marca").querySelector("small").textContent = "Earth as seen by the NISAR radar";
       document.querySelector('#modos [data-modo="recorrido"]').textContent = "Tour";
       document.querySelector('#modos [data-modo="explorar"]').textContent = "Explore";
       $("experto").querySelector("span").textContent = "For experts";
       txt("salirCine", "Exit"); txt("cargando", "Loading the planet…");
-      $("selector").querySelector(".sub").textContent = "The full tours are in Spanish for now. The 90-second version and Explore are in English.";
+      traducirUI();
       txt("selTit", "Three ways to tour it"); txt("selCerrar", "Back");
       const A = $("ayudaExplorar");
       A.querySelector("h2").textContent = "Explore the planet";
