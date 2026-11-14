@@ -1834,6 +1834,7 @@
   function traducirUI(){
     const Q = (sel, t, attr) => document.querySelectorAll(sel).forEach(e => attr ? e.setAttribute(attr, t) : e.textContent = t);
     const H = (sel, h) => document.querySelectorAll(sel).forEach(e => e.innerHTML = h);
+    document.title = "LandSense · Earth as seen by the NISAR radar";
     Q("#marca", "Back to the cover", "title");
     Q("#btnCalidad", "High-quality map. Turn it off if your phone is slow.", "title");
     Q("#btnVersion", "Choose another way to tour it", "title");
