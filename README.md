@@ -6,7 +6,7 @@ LandSense is an interactive 3D web story and a set of open analysis scripts buil
 
 Built for the **NASA Space Apps Challenge 2026**, challenge *Dancing with the SARs*.
 
-**Live app:** _link coming soon_
+**Live app:** https://fedesina.github.io/landsense/
 
 ---
 
