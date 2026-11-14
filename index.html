@@ -680,7 +680,7 @@
     dsGlobal.show = false;
     punto = puntos[id]; puntoId = id; iFecha = 0;
     const b = punto.bounds, rect = Cesium.Rectangle.fromDegrees(b.west, b.south, b.east, b.north);
-    const cache = {};                     // un mismo archivo (p. ej. vacio.png) se pide una sola vez
+    const cache = {};                     // un mismo archivo (p. ej. vacio.webp) se pide una sola vez
     const pedir = a => cache[a] || (cache[a] = Cesium.SingleTileImageryProvider.fromUrl(`puntos/${id}/${a}`, {rectangle: rect}));
     const listas = punto.capas.map(c => (c.archivos || (c.momentos ? [c.momentos.antes, c.momentos.despues] : [c.archivo])));
     const provs = await Promise.all(listas.map(l => Promise.all(l.map(pedir))));   // todo en paralelo
