@@ -1,0 +1,83 @@
+{
+ "id": "apipe",
+ "tipo": "serie",
+ "bounds": {
+  "west": -56.95,
+  "south": -27.6,
+  "east": -56.55,
+  "north": -27.4
+ },
+ "fechas": [
+  "20260626",
+  "20260708",
+  "20260720",
+  "20260813",
+  "20260825",
+  "20260906",
+  "20260918",
+  "20260930",
+  "20261012"
+ ],
+ "fechas_texto": [
+  "26 de junio de 2026",
+  "8 de julio de 2026",
+  "20 de julio de 2026",
+  "13 de agosto de 2026",
+  "25 de agosto de 2026",
+  "6 de septiembre de 2026",
+  "18 de septiembre de 2026",
+  "30 de septiembre de 2026",
+  "12 de octubre de 2026"
+ ],
+ "fecha_referencia": "26 de junio de 2026",
+ "satelite": "NISAR (NASA-ISRO), radar banda L, producto GCOV PROVISIONAL (HH+HV, 20 m)",
+ "pares": "Órbita 010 descendente, frame 102: 9 pasadas",
+ "camara": {
+  "lon": -56.75,
+  "lat": -27.5,
+  "radio_m": 15000,
+  "distancia_m": 48000
+ },
+ "inicio": {
+  "capa": "ojos",
+  "fecha": "20261012"
+ },
+ "nombre": "Yacyretá e isla Apipé",
+ "lugar": "Río Paraná, Corrientes (Argentina) y Paraguay",
+ "estado": "Solo imagen, sin analizar",
+ "color": "azul",
+ "titular": "La represa de Yacyretá y la isla Apipé, vistas por el radar",
+ "que_es": "Pasadas reales del radar NISAR entre junio y octubre de 2026. Se ven la represa, el embalse y los brazos del Paraná. El río venía creciendo y se esperaba que llegara al nivel de evacuación hacia el 20 de octubre.",
+ "estado_detalle": "Solo mostramos la imagen del radar: todavía no hicimos el análisis con confirmación independiente. Es la zona que vamos a seguir cuando el Paraná llegue a su pico.",
+ "resultado": "Composición src/radar_imagenes.py: R = HH, G = HV, B = HH/HV × brillo; escala fija en todas las fechas.",
+ "evento": "Crecida del río Paraná, octubre de 2026 (en curso)",
+ "limites": [
+  "Es solo la imagen del radar: no afirma que haya agua nueva.",
+  "Entre fechas cambia el color del campo (humedad, cultivos): eso no es agua."
+ ],
+ "capas": [
+  {
+   "id": "ojos",
+   "nombre": "Ojos de NISAR",
+   "archivos": [
+    "ojos_20260626.png",
+    "ojos_20260708.png",
+    "ojos_20260720.png",
+    "ojos_20260813.png",
+    "ojos_20260825.png",
+    "ojos_20260906.png",
+    "ojos_20260918.png",
+    "ojos_20260930.png",
+    "ojos_20261012.png"
+   ],
+   "leyenda": {
+    "titulo": "Los ojos de NISAR: el eco del radar (colores falsos)",
+    "gradiente": "linear-gradient(90deg,#000 0%,#000 18%,#6b7d1e 40%,#c8e06a 62%,#e9b7d6 85%,#fff 100%)",
+    "izq": "sin eco (agua)",
+    "der": "mucho eco",
+    "palabras": "<b>Negro</b>: agua quieta, que hace de espejo.<br><b>Verde-amarillo</b>: vegetación.<br><b>Rosado o blanco</b>: ciudad y construcciones.<br>Es la imagen real del radar, no una foto: no tiene nubes."
+   },
+   "texto_fecha": "{f}: así vio el radar este lugar ese día. Negro = agua."
+  }
+ ]
+}

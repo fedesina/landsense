@@ -1,0 +1,168 @@
+{
+ "id": "tibet",
+ "nombre": "Terremoto del Tíbet",
+ "lugar": "Nagqu, Tíbet (China)",
+ "tipo": "antes_despues",
+ "titular": "NISAR vio el suelo moverse decenas de centímetros alrededor del epicentro",
+ "que_es": "Este mapa no es una foto: compara dos pasadas del radar NISAR, una antes y otra después del sismo, y muestra cuánto se acercó o se alejó cada punto del suelo respecto del satélite. Lo vieron dos órbitas distintas, que coinciden donde se superponen.",
+ "fecha_antes": "19 de octubre de 2026",
+ "fecha_despues": "31 de octubre de 2026",
+ "evento": "Sismo M7,0 del 22 de octubre de 2026 a 18 km de profundidad; falla normal con componente lateral según USGS. Prensa: al menos 16 muertos y unas 339 casas derrumbadas.",
+ "satelite": "NISAR (NASA-ISRO), banda L, productos GUNW de respuesta urgente (UR)",
+ "pares": "Ascendente 112 (19 oct - 31 oct, frame 018) y ascendente 040 (14 oct - 26 oct, frames 017 y 018). Controles: el par anterior de cada órbita (colección provisional).",
+ "estado": "Visto, falta confirmar",
+ "color": "amarillo",
+ "estado_detalle": "Dos órbitas ascendentes distintas ven el mismo movimiento donde se superponen (r = 0,93 y 0,96), y en los pares de control (sin sismo) no aparece nada. No hay pasada descendente con datos, así que no podemos separar cuánto fue hundimiento y cuánto movimiento de costado. La confirmación independiente queda pendiente.",
+ "resultado": "src/sismo_generico.py --con-ur: C1 asc 23,9× (112 A) y 4,9-5,5× (040 A); desc sin datos (163 D) → C1 no pasa por regla. C2 PASA (040 A vs 112 A r = 0,93 / 0,96). C3 y C4 no evaluables (sin descendente). Sin errores de desenrollado (0,47 saltos de λ/2 por 10.000 vs 22,6 en el par fallado de Panamá). Hueco junto a la ruptura: 64 % sin desenrollar y 36 % de baja coherencia (src/sismo_tibet_chequeo_hueco.py).",
+ "limites": [
+  "Mide solo en la línea de vista del satélite: azul puede ser hacia el oeste o hacia abajo; sin una pasada descendente no se separa.",
+  "La pasada descendente (163 D) no tiene datos válidos en la zona, ni antes ni después del sismo.",
+  "Junto a la ruptura hay una zona sin dato: ahí el movimiento cambia tan de golpe que el cálculo no pudo seguirlo (y en parte el radar no reconoce el suelo). Los valores pegados a esa zona no se citan.",
+  "La órbita 040 solo cubre el borde oeste de la zona, lejos del epicentro.",
+  "Los pares que cruzan el sismo son de la colección de respuesta urgente de NASA; los controles, de la provisional (mismo procesamiento).",
+  "Valores relativos dentro de la imagen; no se predicen sismos: se mide lo que ya ocurrió."
+ ],
+ "bounds": {
+  "west": 93.26184050713468,
+  "east": 94.30584050713637,
+  "north": 32.784969596799314,
+  "south": 31.889469596797866
+ },
+ "escala_cm": 50.0,
+ "capas": [
+  {
+   "id": "los_112A",
+   "nombre": "Órbita 112 (19 de octubre → 31 de octubre)",
+   "izquierda": "se alejó",
+   "derecha": "se acercó",
+   "texto_izq": "el suelo se alejó del satélite (hacia el oeste o hacia abajo)",
+   "texto_der": "el suelo se acercó al satélite (hacia el este o hacia arriba)",
+   "texto_neutro": "blanco: casi no se movió",
+   "archivo": "los_112A.png",
+   "validos": 1004431,
+   "p1": -70.4,
+   "p99": 27.0
+  },
+  {
+   "id": "los_040A",
+   "nombre": "Órbita 040 (14 de octubre → 26 de octubre)",
+   "izquierda": "se alejó",
+   "derecha": "se acercó",
+   "texto_izq": "el suelo se alejó del satélite (hacia el oeste o hacia abajo)",
+   "texto_der": "el suelo se acercó al satélite (hacia el este o hacia arriba)",
+   "texto_neutro": "blanco: casi no se movió",
+   "archivo": "los_040A.png",
+   "validos": 202332,
+   "p1": -9.5,
+   "p99": 12.0
+  }
+ ],
+ "camara": {
+  "lon": 93.7837,
+  "lat": 32.3376,
+  "radio_m": 50000,
+  "distancia_m": 170000
+ },
+ "epicentros": [
+  {
+   "id": "us6000u43g",
+   "mag": 7,
+   "lugar": "189 km ENE of Nagqu, China",
+   "lon": 93.7837,
+   "lat": 32.3376,
+   "prof_km": 18,
+   "dentro": true
+  }
+ ],
+ "falla": {
+  "nombre": "Falla (modelo USGS, trazo aproximado)",
+  "puntos": [
+   [
+    93.9,
+    32.15
+   ],
+   [
+    93.906,
+    32.176
+   ],
+   [
+    93.913,
+    32.203
+   ],
+   [
+    93.92,
+    32.229
+   ],
+   [
+    93.926,
+    32.256
+   ],
+   [
+    93.933,
+    32.282
+   ],
+   [
+    93.94,
+    32.309
+   ],
+   [
+    93.946,
+    32.335
+   ],
+   [
+    93.953,
+    32.361
+   ],
+   [
+    93.96,
+    32.388
+   ],
+   [
+    93.966,
+    32.414
+   ],
+   [
+    93.973,
+    32.441
+   ],
+   [
+    93.98,
+    32.467
+   ],
+   [
+    93.986,
+    32.493
+   ],
+   [
+    93.993,
+    32.52
+   ],
+   [
+    93.999,
+    32.546
+   ],
+   [
+    94.006,
+    32.573
+   ],
+   [
+    94.013,
+    32.599
+   ],
+   [
+    94.019,
+    32.625
+   ],
+   [
+    94.026,
+    32.652
+   ],
+   [
+    94.033,
+    32.678
+   ]
+  ],
+  "fuente": "Falla: borde superior del modelo de falla finita del USGS para us6000u43g (versión 2).",
+  "nota": "Borde superior del plano del modelo de falla finita; no es el trazo exacto en superficie. Ese modelo usó también datos de radar, así que no es una comparación independiente."
+ }
+}

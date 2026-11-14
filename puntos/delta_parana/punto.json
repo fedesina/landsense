@@ -1,0 +1,277 @@
+{
+ "id": "delta_parana",
+ "tipo": "serie",
+ "nombre": "Delta del Paraná: el humedal visto por radar",
+ "lugar": "Delta inferior del río Paraná, Buenos Aires y Entre Ríos, Argentina",
+ "titular": "A comienzos de agosto el agua cubrió los bajos de las islas del Delta; NISAR lo vio a través de las nubes",
+ "que_es": "Esto no es una foto: son 7 pasadas del radar NISAR entre junio y septiembre de 2026, una cada 12 días. El radar mide cuánto eco devuelve cada lugar: la vegetación devuelve mucho, el agua quieta casi nada. Mové la línea de tiempo para ver cómo cambió el humedal.",
+ "estado": "VALIDADO",
+ "estado_detalle": "Validado con dos mapas de agua de NASA (OPERA DSWx), independientes de NISAR: en las zonas donde el radar vio apagarse el eco, el agua pasó de alrededor del 5% en junio y julio a cerca del 70% a fines de agosto (mapa óptico) y bajó en septiembre; en las zonas sin cambio casi no se movió. El anegamiento empezó entre el 28 de julio y el 7 de agosto. Lo que NO sabemos es por qué: desborde del río, lluvia o sudestada.",
+ "resultado": "NISAR: el eco se apagó fuerte (más de 3 dB) en el 10.7% del área entre el 20 de julio y el 13 de agosto, contra 0.1-1.8% en los intervalos sin evento. Zonas que cambiaron: el eco cae en las dos polarizaciones a la vez (HH y HV, ~5 dB), parte pasa a verse como agua abierta, y se recupera de a poco (−4,8 dB el 25-ago, −3,6 el 6-sep, −2,7 el 18-sep). Sobre 417 focos FIRMS en la zona, el eco donde hubo fuego casi no cambió: la banda L ve bien el fuego en bosque, no en pastizal.",
+ "evento": "Cambio del humedal entre el 20 de julio y el 13 de agosto de 2026 (causa sin confirmar)",
+ "satelite": "NISAR (NASA-ISRO), banda L, producto GCOV provisional (HH y HV), promedio ~100 m. Validación: OPERA DSWx-HLS y DSWx-S1 (NASA JPL / PO.DAAC), mapas de agua de 30 m",
+ "pares": "Órbita 010 descendente, 7 fechas: 26 de junio de 2026, 8 de julio de 2026, 20 de julio de 2026, 13 de agosto de 2026, 25 de agosto de 2026, 6 de septiembre de 2026, 18 de septiembre de 2026",
+ "limites": [
+  "Que es agua está confirmado; por qué llegó el agua (río, lluvia o viento) no.",
+  "Los porcentajes de agua de NASA varían hasta ~15 puntos entre días y sensores: sirven para ver la tendencia, no como cifra exacta de un día.",
+  "Entre el 27 de julio y el 10 de agosto NISAR no tomó datos (hueco del instrumento); los mapas de agua de NASA ubican el comienzo del anegamiento entre el 28 de julio y el 7 de agosto.",
+  "El intervalo del cambio dura 24 días; los demás, 12.",
+  "Promedio a unos 100 m: no se ven detalles más chicos.",
+  "El radar no ve bien incendios de pastizal ni junco (sí de bosque)."
+ ],
+ "bounds": {
+  "west": -59.29951382404533,
+  "east": -58.80051382404648,
+  "south": -34.10743876785099,
+  "north": -33.59243876785218
+ },
+ "fechas": [
+  "20260626",
+  "20260708",
+  "20260720",
+  "20260813",
+  "20260825",
+  "20260906",
+  "20260918"
+ ],
+ "fechas_texto": [
+  "26 de junio de 2026",
+  "8 de julio de 2026",
+  "20 de julio de 2026",
+  "13 de agosto de 2026",
+  "25 de agosto de 2026",
+  "6 de septiembre de 2026",
+  "18 de septiembre de 2026"
+ ],
+ "fecha_referencia": "la media del 26 de junio, 8 de julio y 20 de julio",
+ "capas": [
+  {
+   "id": "eco",
+   "nombre": "Qué ve el radar",
+   "archivos": [
+    "eco_20260626.png",
+    "eco_20260708.png",
+    "eco_20260720.png",
+    "eco_20260813.png",
+    "eco_20260825.png",
+    "eco_20260906.png",
+    "eco_20260918.png"
+   ],
+   "leyenda": {
+    "titulo": "Eco del radar (colores falsos, estilo NISAR)",
+    "gradiente": "linear-gradient(90deg,#000,#1a8f1a,#d23cd2)",
+    "izq": "poco eco",
+    "der": "mucho eco",
+    "palabras": "<b>Negro</b>: agua quieta (casi sin eco).<br><b>Verde</b>: vegetación.<br><b>Magenta</b>: superficies duras o lisas (suelo desnudo, construcciones)."
+   }
+  },
+  {
+   "id": "cambio",
+   "nombre": "Qué cambió",
+   "archivos": [
+    "cambio_20260626.png",
+    "cambio_20260708.png",
+    "cambio_20260720.png",
+    "cambio_20260813.png",
+    "cambio_20260825.png",
+    "cambio_20260906.png",
+    "cambio_20260918.png"
+   ],
+   "leyenda": {
+    "titulo": "Dónde cambió fuerte el eco (respecto de fines de junio y julio)",
+    "gradiente": "linear-gradient(90deg,#2166ac 0%,#92c5de 45%,transparent 45%,transparent 55%,#f4a582 55%,#b2182b 100%)",
+    "izq": "se apagó (−6 dB)",
+    "der": "subió (+6 dB)",
+    "palabras": "<b style='color:#2166ac'>Azul</b>: el eco se apagó fuerte (por ejemplo, agua que cubre la vegetación).<br><b style='color:#b2182b'>Rojo</b>: el eco subió fuerte.<br>Sin color: cambió menos de 3 dB, el temblor normal del radar (sin evento, solo 0,1-1,8% del Delta lo supera).<br>Los cuadraditos del sudoeste son campos: ahí los cambios son trabajo agrícola, no el humedal."
+   }
+  }
+ ],
+ "inicio": {
+  "capa": "cambio",
+  "fecha": "20260813"
+ },
+ "camara": {
+  "lon": -59.050397856738016,
+  "lat": -33.84975457060352,
+  "radio_m": 25000,
+  "distancia_m": 80000
+ },
+ "marcadores": [],
+ "grafico": {
+  "titulo": "% de agua según los mapas de agua de NASA (OPERA DSWx)",
+  "eje": "% con agua",
+  "desde": "20260612",
+  "hasta": "20260925",
+  "hueco": [
+   "20260727",
+   "20260810"
+  ],
+  "series": [
+   {
+    "nombre": "Zonas que marcó NISAR (óptico)",
+    "color": "#2166ac",
+    "punteada": false,
+    "puntos": [
+     [
+      "20260616",
+      3.4
+     ],
+     [
+      "20260626",
+      9.9
+     ],
+     [
+      "20260807",
+      39.4
+     ],
+     [
+      "20260810",
+      42.9
+     ],
+     [
+      "20260822",
+      70.0
+     ],
+     [
+      "20260830",
+      69.8
+     ],
+     [
+      "20260904",
+      49.3
+     ],
+     [
+      "20260915",
+      62.4
+     ],
+     [
+      "20260916",
+      47.5
+     ]
+    ]
+   },
+   {
+    "nombre": "Zonas sin cambio, control (óptico)",
+    "color": "#8a8a8a",
+    "punteada": false,
+    "puntos": [
+     [
+      "20260616",
+      10.1
+     ],
+     [
+      "20260626",
+      12.2
+     ],
+     [
+      "20260807",
+      19.8
+     ],
+     [
+      "20260810",
+      18.0
+     ],
+     [
+      "20260822",
+      23.6
+     ],
+     [
+      "20260830",
+      20.3
+     ],
+     [
+      "20260904",
+      14.4
+     ],
+     [
+      "20260915",
+      18.1
+     ],
+     [
+      "20260916",
+      14.3
+     ]
+    ]
+   },
+   {
+    "nombre": "Zonas que marcó NISAR (radar Sentinel-1)",
+    "color": "#2166ac",
+    "punteada": true,
+    "puntos": [
+     [
+      "20260621",
+      0.3
+     ],
+     [
+      "20260704",
+      0.5
+     ],
+     [
+      "20260716",
+      0.3
+     ],
+     [
+      "20260728",
+      0.5
+     ],
+     [
+      "20260809",
+      11.2
+     ],
+     [
+      "20260821",
+      21.0
+     ],
+     [
+      "20260902",
+      11.6
+     ],
+     [
+      "20260914",
+      8.6
+     ]
+    ]
+   },
+   {
+    "nombre": "Zonas sin cambio, control (radar Sentinel-1)",
+    "color": "#8a8a8a",
+    "punteada": true,
+    "puntos": [
+     [
+      "20260621",
+      8.3
+     ],
+     [
+      "20260704",
+      10.3
+     ],
+     [
+      "20260716",
+      8.8
+     ],
+     [
+      "20260728",
+      8.6
+     ],
+     [
+      "20260809",
+      9.4
+     ],
+     [
+      "20260821",
+      9.5
+     ],
+     [
+      "20260902",
+      8.4
+     ],
+     [
+      "20260914",
+      10.1
+     ]
+    ]
+   }
+  ],
+  "nota": "Línea continua: mapa óptico (Landsat/Sentinel-2, solo días despejados). Punteada: mapa de radar Sentinel-1 (cuenta solo agua abierta, por eso da menos). Franja: días sin datos de NISAR."
+ }
+}

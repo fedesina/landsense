@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LandSense · la Tierra vista por el radar NISAR</title>
+<!--
+  LandSense: visor 3D (CesiumJS) de los cambios de la superficie medidos con NISAR.
+  - Portada (globo de fondo que no se toca hasta elegir modo) + modo de 90 segundos + RECORRIDO guiado
+    (para chicos / general / en detalle; la pagina "maneja": un efecto por paso) + EXPLORAR (globo libre).
+  - Para chicos: narra NISAR (personaje SVG que apunta un haz).
+  - Calidad: dibuja segun la densidad real de la pantalla (hasta 2x), baja la resolucion solo mientras el mapa
+    se mueve; boton HD para modo ahorro.
+  - Globo: web/sismos.json (src/sismos_export_visor.py, desde catalogo USGS + tabla_final.md) y puntos de agua.
+  - Escenas: puntos/index.json + puntos/<id>/punto.json (generados por los scripts de src/).
+  - Semaforo unico: verde verificado/validado, amarillo indicio, azul esperando dato, gris no se puede.
+  - Solo se afirman resultados que pasaron los controles (ver README); los indicios se dicen como indicios.
+  - Abrir con un servidor local (p. ej. Live Server o python -m http.server); el token de Cesium va en config.js.
+-->
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.120/Build/Cesium/Cesium.js"></script>
+<script src="config.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/cesium@1.120/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --agua:#07131B; --pizarra:#13232E; --pizarra2:#1B3140; --borde:#2C4554;
+    --texto:#E8EEF0; --suave:#A8B8C0; --radar:#C8E06A;
+    --verde:#5DBB7E; --amarillo:#E6B83A; --azul:#5AA8E3; --gris:#8D989F;
+    --este:#d6604d; --oeste:#4393c3;
+    --titulo:"Archivo",system-ui,sans-serif; --cuerpo:"Atkinson Hyperlegible",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body,#globo{width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:var(--agua)}
+  body{font-family:var(--cuerpo);color:var(--texto);font-size:16px;line-height:1.5}
+  [hidden]{display:none !important}
+  button{font:inherit;color:inherit}
+  button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--radar);outline-offset:2px}
+  .cesium-viewer-bottom{opacity:.6}
+
+  /* barra superior */
+  #barra{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:center;gap:20px;
+    padding:14px 20px;background:linear-gradient(var(--agua) 0%,rgba(7,19,27,0) 100%);pointer-events:none}
+  #barra > *{pointer-events:auto}
+  #marca{font-family:var(--titulo);font-stretch:125%;font-weight:800;font-size:19px;letter-spacing:.01em;
+    background:none;border:0;padding:0;cursor:pointer}
+  #marca small{font-family:var(--cuerpo);font-weight:400;font-size:13px;color:var(--suave);margin-left:8px;letter-spacing:0}
+  #modos{display:flex;gap:4px;margin-left:auto;background:rgba(19,35,46,.85);border:1px solid var(--borde);border-radius:999px;padding:3px}
+  #modos button{border:0;background:none;padding:6px 14px;border-radius:999px;cursor:pointer;font-size:14.5px}
+  #modos button[aria-pressed="true"]{background:var(--radar);color:var(--agua);font-weight:700}
+  #experto{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--suave);cursor:pointer}
+  #experto input{accent-color:var(--radar)}
+
+  /* portada */
+  #portada{position:absolute;left:0;top:0;bottom:0;z-index:5;width:min(600px,100%);display:flex;flex-direction:column;
+    justify-content:center;padding:90px 48px 48px;background:linear-gradient(90deg,rgba(7,19,27,.94) 55%,rgba(7,19,27,0))}
+  #portada h1{font-family:var(--titulo);font-stretch:112%;font-weight:800;font-size:clamp(32px,4.2vw,52px);
+    line-height:1.04;letter-spacing:-.01em;margin:0 0 22px;max-width:12ch}
+  #portada .bajada{font-size:19px;line-height:1.55;color:var(--suave);margin:0 0 26px;max-width:46ch}
+  #portada .resumen{font-size:16.5px;margin:0 0 30px;max-width:48ch;padding-left:14px;border-left:3px solid var(--radar)}
+  .acciones{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{border:1px solid var(--borde);background:var(--pizarra);padding:11px 20px;border-radius:6px;cursor:pointer;font-size:16px}
+  .btn.prim{background:var(--radar);border-color:var(--radar);color:var(--agua);font-weight:700}
+  .btn:hover{border-color:var(--radar)}
+  .btn:disabled{opacity:.35;cursor:default}
+
+  /* panel lateral (recorrido y explorar) */
+  #panel{scrollbar-width:thin;scrollbar-color:var(--borde) transparent}
+  #panel{position:absolute;top:66px;left:16px;z-index:5;width:390px;max-height:calc(100% - 82px);overflow:auto;
+    background:rgba(19,35,46,.96);border:1px solid var(--borde);border-radius:10px;padding:18px 20px 18px;
+    box-shadow:0 10px 40px rgba(0,0,0,.45)}
+  #pasos{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 14px}
+  #puntitos{display:flex;gap:4px;flex:1 0 100%}      /* barra de progreso en fila propia: chica parecia texto cortado */
+  #puntitos i{height:5px;flex:1;border-radius:3px;background:var(--borde)}
+  #pasoN{margin-right:auto}
+  #puntitos i.hecho{background:var(--radar)}
+  #pasoN{font-size:13px;color:var(--suave);white-space:nowrap}
+  #cap h2{font-family:var(--titulo);font-stretch:110%;font-weight:750;font-size:26px;line-height:1.12;margin:0 0 10px}
+  #cap p{margin:0 0 12px}
+  #navCap{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--borde)}
+  #navCap .btn{flex:1}
+
+  .sello{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:700;padding:4px 10px 4px 8px;
+    border-radius:999px;background:var(--pizarra2);margin:0 0 10px}
+  .sello::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c,var(--gris))}
+
+  #nombre{font-size:14px;color:var(--suave);margin:0}
+  #titular{font-family:var(--titulo);font-stretch:108%;font-weight:750;font-size:24px;line-height:1.15;margin:4px 0 10px}
+  #queEs{margin:0 0 12px;color:var(--suave)}
+  #estadoDet{font-size:14.5px;line-height:1.5;margin:0 0 12px}
+  .nota{font-size:14.5px;line-height:1.5;margin:0 0 12px;padding:10px 12px;background:var(--pizarra2);border-radius:6px;
+    border-left:4px solid var(--c,var(--radar))}
+  .grupo{margin:16px 0}
+  .grupo > span{display:block;font-size:14px;font-weight:700;margin-bottom:7px}
+  .seg{display:flex;border:1px solid var(--borde);border-radius:6px;overflow:hidden}
+  .seg button{flex:1;font-size:14.5px;padding:8px 6px;border:0;background:var(--pizarra2);cursor:pointer;line-height:1.25}
+  .seg button + button{border-left:1px solid var(--borde)}
+  .seg button[aria-pressed="true"]{background:var(--texto);color:var(--agua);font-weight:700}
+  .seg button small{display:block;font-size:12px;opacity:.8;font-weight:400}
+  #momentoTxt,#serieTxt{font-size:14px;color:var(--suave);margin:7px 0 0}
+  .check{display:flex;align-items:center;gap:9px;font-size:14.5px;margin:6px 0;cursor:pointer}
+  .check input{accent-color:var(--radar);width:17px;height:17px}
+  input[type=range]{width:100%;accent-color:var(--radar)}
+  .fila{display:flex;gap:8px;flex-wrap:wrap}
+  .fila .btn{padding:7px 12px;font-size:14px}
+  .graf{margin:4px 0 12px;background:#EEF2EC;color:#18222C;border-radius:6px;padding:10px}
+  .graf .gtit{font-size:13.5px;font-weight:700;margin:0 0 4px}
+  .graf svg{width:100%;height:auto;display:block}
+  .graf .gnota{font-size:12.5px;color:#444;margin:4px 0 0;line-height:1.4}
+  .graf .gley{font-size:12.5px;margin:4px 0 0;display:flex;gap:12px;flex-wrap:wrap}
+  .graf .gley i{display:inline-block;width:16px;height:3px;vertical-align:middle;margin-right:4px}
+  .graf:empty{display:none}
+  details{margin-top:12px;font-size:14.5px;border-top:1px solid var(--borde);padding-top:10px}
+  summary{cursor:pointer;font-weight:700}
+  details p,details ul{margin:7px 0 0;color:var(--suave)}
+  details ul{padding-left:18px}
+  .solo-experto{display:none}
+  /* recorrido: la pagina maneja; la ficha con herramientas es solo de Explorar */
+  body.modo-recorrido #ficha{display:none !important}
+  .capitulo{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--radar);margin:0 0 6px}
+  .subt{font-size:14px;color:var(--suave);margin:10px 0 0;min-height:1.5em}
+  .reloj{font-family:var(--titulo);font-stretch:108%;font-weight:700;font-size:20px;margin:0 0 10px;color:var(--radar);min-height:1.3em}
+  .cifra{font-family:var(--titulo);font-stretch:112%;font-weight:800;font-size:38px;line-height:1;margin:6px 0 4px;color:#fd8d3c;font-variant-numeric:tabular-nums}
+  #leyRec{margin:12px 0 0;font-size:13px}
+  #leyRec:empty{display:none}
+  #leyRec .lt{font-weight:700;margin-bottom:5px}
+  #leyRec .lb{height:10px;border-radius:3px}
+  #leyRec .le{display:flex;justify-content:space-between;color:var(--suave);margin-top:3px}
+  #leyRec .ls{margin-top:6px;line-height:1.7}
+  #puntitos .sep{flex:0 0 6px;background:none}
+  #navCap #btnRep{flex:0 0 auto;padding:11px 14px}
+  #btnCalidad{border:1px solid var(--borde);background:rgba(19,35,46,.85);border-radius:999px;padding:5px 10px;font-size:13px;
+    font-weight:700;cursor:pointer;color:var(--suave);letter-spacing:.04em}
+  #btnCalidad[aria-pressed="true"]{color:var(--agua);background:var(--radar);border-color:var(--radar)}
+  .limites-lista.entra li{animation:entra .5s ease both;animation-delay:calc(var(--i) * .35s)}
+  @keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  #navCap{position:sticky;bottom:-18px;background:rgba(19,35,46,.98);margin-bottom:-18px;padding-bottom:18px}
+  body.experto .solo-experto{display:block}
+  #volver{margin:0 0 12px;padding:6px 12px;font-size:14px}
+
+  /* ilustracion "como ve el radar" */
+  .ecos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 4px}
+  .ecos figure{margin:0;text-align:center;font-size:13px;color:var(--suave)}
+  .ecos svg{width:100%;height:auto;display:block;background:var(--agua);border-radius:6px;margin-bottom:5px}
+  .ecos b{display:block;color:var(--texto);font-size:14px}
+  /* lista de limites */
+  .limites-lista{list-style:none;padding:0;margin:8px 0 0}
+  .limites-lista li{padding:9px 0 9px 22px;border-top:1px solid var(--borde);position:relative;font-size:14.5px}
+  .limites-lista li::before{content:"";position:absolute;left:2px;top:15px;width:10px;height:10px;border-radius:50%;background:var(--gris)}
+  .limites-lista b{display:block}
+  .limites-lista span{color:var(--suave)}
+
+  /* leyenda */
+  #leyenda{position:absolute;right:16px;bottom:26px;z-index:5;background:rgba(19,35,46,.96);border:1px solid var(--borde);
+    border-radius:10px;padding:12px 14px;width:300px;font-size:14px}
+  #leyTitulo{font-weight:700;margin-bottom:7px}
+  #barraColor{height:12px;border-radius:3px;background:linear-gradient(90deg,var(--oeste),#92c5de,#f7f7f7,#f4a582,var(--este))}
+  #extremos{display:flex;justify-content:space-between;font-size:13px;color:var(--suave);margin-top:4px}
+  #leyPalabras{margin:8px 0 0;line-height:1.5}
+  #simbolos{line-height:1.8;margin-top:8px;border-top:1px solid var(--borde);padding-top:7px}
+  .sim{display:inline-block;vertical-align:middle;margin-right:7px}
+  .sim.epi{width:11px;height:11px;border-radius:50%;background:#E0301E;border:2px solid #fff}
+  .sim.falla{width:22px;border-top:3px dashed #fff}
+  .sim.flecha{width:22px;height:0;border-top:4px solid #0a0a0a;box-shadow:0 0 0 1px rgba(255,255,255,.5)}
+  .sim.pob{width:22px;height:11px;border-radius:2px;background:linear-gradient(90deg,#fed976,#fd8d3c,#bd0026)}
+  .sim.gris{width:22px;height:11px;border-radius:2px;background:#808080;opacity:.6}
+  .sim.alta{width:14px;height:14px;background:#a50f15}
+  .sim.media{width:14px;height:14px;background:#fd8d3c}
+  .sim.campo{width:9px;height:9px;border-radius:50%;background:#111;border:2px solid #fff}
+  .sem{display:grid;grid-template-columns:auto 1fr;gap:4px 9px;align-items:center}
+  .sem i{width:12px;height:12px;border-radius:50%;background:var(--c)}
+  .sem i.rombo{border-radius:2px;transform:rotate(45deg) scale(.85)}
+
+  #corte{position:absolute;top:0;bottom:0;z-index:4;width:0;border-left:3px solid var(--radar);cursor:ew-resize;touch-action:none}
+  #corte b{position:absolute;top:50%;left:-19px;width:36px;height:36px;margin-top:-18px;border-radius:50%;background:var(--radar);
+    box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  #corte b::before{content:"\2194";color:var(--agua);font-size:20px;font-weight:700;display:block;text-align:center;line-height:36px}
+  #corte span{position:absolute;top:84px;white-space:nowrap;font-size:13.5px;font-weight:700;background:rgba(7,19,27,.85);padding:4px 9px;border-radius:4px}
+  #corteIzq{right:12px} #corteDer{left:12px}
+  #corte::after{content:"";position:absolute;inset:0 -14px}
+  #tip{position:absolute;z-index:8;pointer-events:none;background:var(--pizarra);border:1px solid var(--borde);
+    border-radius:6px;padding:7px 10px;font-size:13.5px;max-width:260px;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  #aviso{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:9;background:rgba(0,0,0,.7)}
+  #aviso div{background:var(--pizarra);max-width:440px;padding:20px;border-radius:8px}
+
+  /* portada sobre un velo que oscurece el globo y bloquea tocarlo */
+  #velo{position:absolute;inset:0;z-index:4;background:radial-gradient(ellipse at 72% 50%,rgba(7,19,27,.25),rgba(7,19,27,.82) 70%)}
+  /* selector de version */
+  #selector{position:absolute;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:rgba(4,10,14,.72)}
+  #selector .caja{background:var(--pizarra);border:1px solid var(--borde);border-radius:14px;padding:24px;max-width:760px;width:100%;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:100%;overflow:auto}
+  #selector h2{font-family:var(--titulo);font-stretch:110%;font-weight:800;font-size:26px;margin:0 0 6px}
+  #selector .sub{color:var(--suave);margin:0 0 18px}
+  #opciones{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  #opciones button{text-align:left;background:var(--pizarra2);border:2px solid var(--borde);border-radius:12px;padding:16px;cursor:pointer;
+    display:flex;flex-direction:column;gap:8px}
+  #opciones button:hover,#opciones button:focus-visible{border-color:var(--radar)}
+  #opciones b{font-family:var(--titulo);font-stretch:108%;font-size:19px}
+  #opciones span{font-size:14.5px;color:var(--suave);line-height:1.45}
+  #opciones i{font-style:normal;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--radar)}
+  #selector .cerrar{margin-top:16px;background:none;border:0;color:var(--suave);text-decoration:underline;cursor:pointer;padding:0}
+  #btnVersion{background:none;border:0;color:var(--suave);font-size:12.5px;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap}
+  .tec{margin-top:12px}
+  /* version chicos: un poco mas grande y redondeada */
+  body.v-chicos #cap p{font-size:17px}
+  body.v-chicos #panel{border-radius:16px;border-color:#3f6b55}
+  body.v-chicos #cap h2{font-size:27px}
+  .probar{background:#203a2e;border-radius:10px;padding:10px 12px;margin:0 0 12px;border-left:4px solid var(--verde)}
+  .oficios{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;padding:0;list-style:none}
+  .oficios li{background:var(--pizarra2);border:1px solid var(--borde);border-radius:999px;padding:4px 11px;font-size:14px}
+  /* personaje NISAR y su haz */
+  #nisar{position:absolute;z-index:5;right:36px;top:84px;width:170px;pointer-events:none;
+    transition:transform 1.2s cubic-bezier(.2,.8,.2,1),opacity .6s}
+  #nisar.fuera{transform:translate(160%,-40%) rotate(14deg);opacity:0}
+  #nisar svg{width:100%;height:auto;display:block;overflow:visible;animation:flota 4s ease-in-out infinite}
+  @keyframes flota{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  #haz{position:absolute;inset:0;z-index:4;pointer-events:none;width:100%;height:100%}
+  #haz polygon{fill:url(#gradHaz)}
+  #haz circle{fill:none;stroke:var(--radar);stroke-width:2.5;opacity:.9;transform-box:fill-box;transform-origin:center;animation:pulso 2s ease-out infinite}
+  @keyframes pulso{from{transform:scale(.4);opacity:.95}to{transform:scale(1.6);opacity:0}}
+
+  @media (max-width:760px){
+    #nisar{right:6px;top:56px;width:92px}
+    #opciones{grid-template-columns:1fr}
+    #selector .caja{padding:18px}
+    #selector h2{font-size:22px}
+    #portada{width:100%;padding:80px 22px 28px;justify-content:flex-end;background:linear-gradient(0deg,rgba(7,19,27,.97) 62%,rgba(7,19,27,.55) 80%,rgba(7,19,27,0) 95%)}
+    #velo{background:rgba(7,19,27,.45)}
+    #portada h1{font-size:30px;margin-bottom:12px}
+    #portada .bajada{font-size:16px;margin-bottom:14px}
+    #portada .resumen{font-size:14.5px;margin-bottom:18px}
+    .acciones .btn{flex:1}
+    #panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:55%;border-radius:12px 12px 0 0;padding:14px 16px}
+    body.modo-recorrido #panel{max-height:50%}
+    #cap h2{font-size:22px}
+    #leyenda{display:none}
+    #marca small{display:none}
+    #marca{font-size:16px}
+    #barra{gap:8px;padding:10px 10px}
+    #modos button{padding:6px 10px;font-size:14px}
+    #experto span{display:none}
+    #corte b{top:24%}                 /* la manija queda en el mapa, no detrás del panel */
+    #corte span{top:64px}
+  }
+
+  /* ===== portada con el dato primero ===== */
+  #portada .ante{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--radar);margin:0 0 10px}
+  #portada .dato{font-family:var(--titulo);font-stretch:125%;font-weight:800;font-size:clamp(88px,13vw,172px);line-height:.86;
+    letter-spacing:-.03em;margin:0 0 16px;font-variant-numeric:tabular-nums}
+  #portada .dato small{font-size:.32em;letter-spacing:0;color:var(--radar);margin-left:.14em}
+  #portada h1{font-size:clamp(25px,3vw,38px);line-height:1.1;max-width:17ch;margin-bottom:16px}
+  #portada .bajada{font-size:17.5px;margin-bottom:24px}
+  #portada .resumen{font-size:14.5px;color:var(--suave);margin:26px 0 0}
+  /* ===== modo cine (la pagina se cuenta sola, pensada para grabar) ===== */
+  #salirCine{display:none;position:absolute;top:14px;right:20px;z-index:7;border:1px solid var(--borde);background:rgba(19,35,46,.7);
+    border-radius:999px;padding:5px 12px;font-size:13px;color:var(--suave);cursor:pointer}
+  body.cine #salirCine{display:block}
+  body.cine #modos,body.cine #btnCalidad,body.cine #experto,body.cine #leyenda,body.cine #navCap,
+  body.cine #btnVersion,body.cine #pasoN{display:none !important}
+  body.cine #panel{top:auto;left:0;right:0;bottom:0;width:auto;max-height:none;overflow:visible;border:0;border-radius:0;box-shadow:none;
+    padding:110px clamp(20px,5vw,64px) 38px;background:linear-gradient(0deg,rgba(7,19,27,.97) 42%,rgba(7,19,27,.7) 70%,rgba(7,19,27,0));pointer-events:none}
+  body.cine #pasos{position:absolute;left:clamp(20px,5vw,64px);right:clamp(20px,5vw,64px);bottom:16px;margin:0}
+  body.cine #puntitos i{height:3px}
+  body.cine #cap > *{animation:entra .6s ease both}
+  body.cine #cap .capitulo{font-size:13px;margin-bottom:8px}
+  body.cine #cap .sello{margin-left:10px;vertical-align:middle;margin-bottom:8px}
+  body.cine #cap .cifra{font-size:clamp(56px,9vw,124px);color:var(--texto);margin:0 0 6px;letter-spacing:-.02em}
+  body.cine #cap h2{font-size:clamp(23px,3.2vw,42px);margin:0 0 8px;max-width:26ch}
+  body.cine #cap .linea{font-size:clamp(15.5px,1.6vw,20px);color:var(--suave);margin:0;max-width:60ch}
+  body.cine #cap .acciones{pointer-events:auto;margin-top:18px}
+  @media (max-width:760px){
+    #portada .dato{font-size:76px;margin-bottom:10px}
+    #portada h1{font-size:24px}
+    #portada .resumen{display:none}
+    body.cine #panel{max-height:none;padding:70px 18px 34px}
+  }
+
+  /* ===== chicos. NISAR habla: personaje grande al lado del panel, que pasa a ser su globo de dialogo ===== */
+  body.v-chicos #btnCalidad,body.v-chicos #experto{display:none}
+  #cola{display:none}
+  #nisar .cara{display:none}
+  #nisar[data-cara="contento"] .c-contento,#nisar[data-cara="sorpresa"] .c-sorpresa,#nisar[data-cara="pensando"] .c-pensando,
+  #nisar[data-cara="serio"] .c-serio,#nisar[data-cara="feliz"] .c-feliz{display:inline}
+  @keyframes salta{0%{scale:1}40%{scale:1.1}100%{scale:1}}
+  #nisar.salta{animation:salta .5s ease}
+  @media (min-width:761px){
+    #nisar{right:auto;left:432px;top:70px;width:250px}
+    #nisar.fuera{transform:translate(-50%,-70%) rotate(-14deg);opacity:0}
+    body.v-chicos.modo-recorrido #panel{width:400px;border:2px solid var(--radar);border-radius:22px;background:#13232E}
+    body.v-chicos #cap p{font-size:17.5px}
+    body.v-chicos.modo-recorrido #cola{display:block;position:absolute;z-index:6;left:405px;top:166px;width:22px;height:22px;
+      background:#13232E;border-top:2px solid var(--radar);border-right:2px solid var(--radar);transform:rotate(45deg);pointer-events:none}
+  }
+
+  /* ===== carga, fuentes, idioma ===== */
+  #globo{transition:opacity .9s ease}
+  body.cargando #globo{opacity:0}
+  #cargando{display:none;position:absolute;left:64%;top:47%;z-index:3;color:var(--suave);font-size:15px;animation:late 1.4s ease-in-out infinite}
+  body.cargando #cargando{display:block}
+  @keyframes late{0%,100%{opacity:.35}50%{opacity:1}}
+  .fuentes{font-size:12.5px;line-height:1.45;color:var(--suave);margin:14px 0 0;max-width:62ch;opacity:.9}
+  #btnIdioma{border:1px solid var(--borde);background:rgba(19,35,46,.85);border-radius:999px;padding:5px 10px;font-size:13px;
+    font-weight:700;cursor:pointer;color:var(--texto);letter-spacing:.04em}
+  #btnIdioma{border-color:var(--radar);white-space:nowrap}
+  #btnIdioma:hover{background:var(--radar);color:var(--agua)}
+  #btnIdioma .corto{display:none}
+  body.cine #btnIdioma{display:none}
+  body.cine #cap .fuentes{margin-top:12px}
+  @media (max-width:760px){ #btnIdioma .largo{display:none} #btnIdioma .corto{display:inline} #cargando{left:0;right:0;top:22%;text-align:center} .fuentes{font-size:11.5px;margin-top:10px} }
+  /* la portada nunca se corta arriba: si no entra, arranca desde arriba y el numero se achica con el alto */
+  #portada{justify-content:safe center;overflow-y:auto;scrollbar-width:none}
+  @media (min-width:761px){ #portada .dato{font-size:clamp(84px,min(13vw,17vh),172px)} }
+  @media (min-width:761px) and (max-height:860px){ #portada{padding-top:78px;padding-bottom:20px} #portada .dato{font-size:92px;margin-bottom:10px}
+    #portada h1{font-size:26px;margin-bottom:10px} #portada .bajada{font-size:16px;margin-bottom:16px} #portada .resumen{margin-top:16px;font-size:13.5px} }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body class="cargando">
+<div id="globo"></div>
+<div id="velo" aria-hidden="true"></div>
+<div id="cargando" aria-live="polite">Cargando el planeta…</div>
+<svg id="haz" hidden aria-hidden="true"><defs><linearGradient id="gradHaz" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#C8E06A" stop-opacity=".55"/><stop offset="1" stop-color="#C8E06A" stop-opacity=".08"/></linearGradient></defs>
+  <polygon id="hazCono" points=""/><circle id="hazBlanco" r="22"/></svg>
+<div id="cola" aria-hidden="true"></div>
+<div id="nisar" class="fuera" hidden aria-hidden="true" data-cara="contento">
+  <!-- NISAR caricatura (dibujo propio): caja dorada con ojos, panel solar, brazo y antena de malla tipo paraguas -->
+  <svg viewBox="0 0 220 170">
+    <g stroke="#0b1a22" stroke-width="2.5" stroke-linejoin="round">
+      <rect x="4" y="74" width="58" height="34" rx="3" fill="#2f5d8a"/>
+      <path d="M23 74v34M42 74v34M4 91h58" stroke="#8fb7dd" stroke-width="1.5"/>
+      <path d="M62 91h14" stroke-width="4"/>
+      <rect x="76" y="66" width="62" height="58" rx="8" fill="#E8B33A"/>
+      <path d="M84 74l10 8M120 110l10-6M86 112l8-4" stroke="#b9861f" stroke-width="2"/>
+      <rect x="90" y="52" width="34" height="16" rx="3" fill="#56636b"/>
+      <circle cx="86" cy="106" r="4.5" fill="#f08a6b" opacity=".6" stroke="none"/><circle cx="130" cy="106" r="4.5" fill="#f08a6b" opacity=".6" stroke="none"/>
+      <g class="cara c-contento"><circle cx="96" cy="91" r="10" fill="#fff"/><circle cx="120" cy="91" r="10" fill="#fff"/><circle cx="97.5" cy="92.5" r="4.5" fill="#0b1a22" stroke="none"/><circle cx="121.5" cy="92.5" r="4.5" fill="#0b1a22" stroke="none"/><circle cx="99.0" cy="91.0" r="1.4" fill="#fff" stroke="none"/><circle cx="123.0" cy="91.0" r="1.4" fill="#fff" stroke="none"/><path d="M100 107q8 7 16 0" fill="none" stroke-width="2.5" stroke-linecap="round"/></g>
+      <g class="cara c-sorpresa"><circle cx="96" cy="91" r="11.5" fill="#fff"/><circle cx="120" cy="91" r="11.5" fill="#fff"/><circle cx="96" cy="91" r="3.6" fill="#0b1a22" stroke="none"/><circle cx="120" cy="91" r="3.6" fill="#0b1a22" stroke="none"/><circle cx="97.5" cy="89.5" r="1.4" fill="#fff" stroke="none"/><circle cx="121.5" cy="89.5" r="1.4" fill="#fff" stroke="none"/><path d="M88 75q8-5 15-1M113 74q8-4 15 1" fill="none" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="108" cy="112" rx="4.5" ry="5.5" fill="#0b1a22" stroke="none"/></g>
+      <g class="cara c-pensando"><circle cx="96" cy="91" r="10" fill="#fff"/><circle cx="120" cy="91" r="10" fill="#fff"/><circle cx="99.5" cy="88" r="4.2" fill="#0b1a22" stroke="none"/><circle cx="123.5" cy="88" r="4.2" fill="#0b1a22" stroke="none"/><circle cx="101.0" cy="86.5" r="1.4" fill="#fff" stroke="none"/><circle cx="125.0" cy="86.5" r="1.4" fill="#fff" stroke="none"/><path d="M89 78h14M113 75l14-3" fill="none" stroke-width="2.5" stroke-linecap="round"/><path d="M101 111h9q4 0 6-3" fill="none" stroke-width="2.5" stroke-linecap="round"/></g>
+      <g class="cara c-serio"><circle cx="96" cy="91" r="10" fill="#fff"/><circle cx="120" cy="91" r="10" fill="#fff"/><circle cx="96" cy="93" r="4.5" fill="#0b1a22" stroke="none"/><circle cx="120" cy="93" r="4.5" fill="#0b1a22" stroke="none"/><circle cx="97.5" cy="91.5" r="1.4" fill="#fff" stroke="none"/><circle cx="121.5" cy="91.5" r="1.4" fill="#fff" stroke="none"/><path d="M88 79l14-3M128 79l-14-3" fill="none" stroke-width="2.5" stroke-linecap="round"/><path d="M101 111q7-2 14 0" fill="none" stroke-width="2.5" stroke-linecap="round"/></g>
+      <g class="cara c-feliz"><path d="M87 94q9-11 18 0M111 94q9-11 18 0" fill="none" stroke-width="2.5" stroke-linecap="round"/><path d="M98 104q10 14 20 0z" fill="#0b1a22"/></g>
+      <path d="M124 54L170 26" stroke-width="5" stroke-linecap="round"/>
+      <g transform="rotate(-22 178 40)">
+        <ellipse cx="178" cy="40" rx="40" ry="15" fill="#dfe5e8"/>
+        <path d="M138 40h80M158 28q-4 12 0 25M178 25v30M198 28q4 12 0 25" fill="none" stroke="#9aa7ad" stroke-width="1.5"/>
+        <ellipse cx="178" cy="40" rx="40" ry="15" fill="none" stroke="#c8962a" stroke-width="3"/>
+      </g>
+    </g>
+  </svg>
+</div>
+
+<header id="barra">
+  <button id="marca" type="button" title="Volver a la portada">LandSense<small>la Tierra vista por el radar NISAR</small></button>
+  <nav id="modos" aria-label="Modo">
+    <button type="button" data-modo="recorrido">Recorrido</button>
+    <button type="button" data-modo="explorar">Explorar</button>
+  </nav>
+  <button id="btnIdioma" type="button"><span class="largo">English version</span><span class="corto">English</span></button>
+  <button id="btnCalidad" type="button" aria-pressed="true" title="Mapa en alta calidad. Apagalo si el celular va lento.">HD</button>
+  <label id="experto"><input type="checkbox" id="chkExperto"><span>Para expertos</span></label>
+</header>
+
+<section id="portada">
+  <p class="ante">La Guaira, Venezuela · 24 de junio de 2026</p>
+  <p class="dato" aria-label="Unos 56 centímetros">56<small>cm</small></p>
+  <h1>El suelo se corrió medio metro. Un radar lo midió desde el espacio.</h1>
+  <p class="bajada">NISAR, el satélite de NASA y la agencia espacial india, ve el suelo de noche y a través de las nubes. Le preguntamos qué cambió en la Tierra desde junio de 2026, y le pedimos que diga cuándo está seguro y cuándo no.</p>
+  <div class="acciones">
+    <button class="btn prim" type="button" id="btnCine">&#9654; Verlo en 90 segundos</button>
+    <button class="btn" type="button" id="btnEmpezar">Recorrido completo</button>
+    <button class="btn" type="button" id="btnExplorar">Explorar el planeta</button>
+  </div>
+  <p class="resumen" id="resumen">Cargando sismos…</p>
+  <p class="fuentes" id="fuentes"></p>
+</section>
+<button type="button" id="salirCine" title="Salir (Esc)">Salir</button>
+
+<aside id="panel" hidden aria-live="polite">
+  <div id="pasos">
+    <div id="puntitos" aria-hidden="true"></div>
+    <span id="pasoN"></span>
+    <button type="button" id="btnVersion" title="Elegir otra forma de recorrerlo"></button>
+  </div>
+
+  <div id="cap"></div>
+
+  <div id="ayudaExplorar" hidden>
+    <h2 style="font-family:var(--titulo);font-stretch:110%;font-size:24px;margin:0 0 8px">Explorá el planeta</h2>
+    <p style="margin:0 0 10px;color:var(--suave)">Cada punto es un sismo fuerte o una crecida desde junio de 2026. Tocá uno para ver qué midió NISAR ahí, o qué no pudo medir y por qué.</p>
+    <p class="fuentes" id="fuentesExp"></p>
+  </div>
+
+  <div id="ficha" hidden>
+    <button class="btn" type="button" id="volver">Volver al planeta</button>
+    <p id="nombre"></p>
+    <h3 id="titular"></h3>
+    <span class="sello" id="estado"></span>
+    <p id="queEs"></p>
+    <p id="estadoDet"></p>
+    <div id="grafico" class="graf" hidden></div>
+    <p id="pobTxt" class="nota" hidden style="--c:#bd0026"></p>
+    <p id="danioTxt" class="nota" hidden style="--c:#a50f15"></p>
+
+    <div class="grupo" id="grupoMomento">
+      <span id="momTit">Comparar</span>
+      <div class="seg" id="momento" role="group" aria-labelledby="momTit">
+        <button type="button" data-m="antes">Antes<small id="fAntes"></small></button>
+        <button type="button" data-m="despues">Después<small id="fDespues"></small></button>
+      </div>
+      <p id="momentoTxt"></p>
+      <div class="fila" style="margin-top:8px"><button class="btn" type="button" id="btnComparar" hidden>Comparar deslizando</button></div>
+    </div>
+    <div class="grupo" id="grupoSerie" hidden>
+      <span>Pasadas del radar</span>
+      <input type="range" id="serieFecha" min="0" max="0" value="0" step="1" aria-label="Fecha de la pasada">
+      <div class="fila" style="margin-top:6px"><button class="btn" type="button" id="btnPlay">Reproducir</button><button class="btn" type="button" id="btnComparar2" hidden>Comparar deslizando</button></div>
+      <p id="serieTxt"></p>
+    </div>
+    <div class="grupo">
+      <span id="capasTit">Qué mirar</span>
+      <div class="seg" id="capas" role="group" aria-labelledby="capasTit"></div>
+    </div>
+    <div class="grupo" id="grupoMostrar">
+      <span>Sumar al mapa</span>
+      <label class="check" id="filaFlechas"><input type="checkbox" id="chkFlechas" checked> Flechas: hacia dónde se movió el suelo</label>
+      <label class="check" id="filaFalla"><input type="checkbox" id="chkFalla" checked> Falla y epicentro (USGS)</label>
+      <label class="check" id="filaPob" hidden><input type="checkbox" id="chkPob"> Personas que viven donde más se movió</label>
+      <label class="check" id="filaDanio" hidden><input type="checkbox" id="chkDanio"> Zonas de derrumbe probable (radar)</label>
+      <label class="check" id="filaCampo" hidden><input type="checkbox" id="chkCampo"> Daño confirmado por voluntarios en el terreno</label>
+    </div>
+    <details>
+      <summary>Qué no puede decir esta medición</summary>
+      <ul id="limites"></ul>
+    </details>
+    <div class="solo-experto">
+      <div class="grupo">
+        <span><label for="opacidad">Transparencia de la capa</label></span>
+        <input type="range" id="opacidad" min="0" max="100" value="85">
+      </div>
+      <div class="grupo">
+        <span>Cámara</span>
+        <div class="fila">
+          <button class="btn" type="button" data-vista="3d">Vista 3D</button>
+          <button class="btn" type="button" data-vista="arriba">Desde arriba</button>
+          <button class="btn" type="button" id="btnOrbita">Girar</button>
+        </div>
+      </div>
+      <details open><summary>Dato técnico</summary><p id="resultado"></p></details>
+      <details><summary>Fuentes</summary><p id="fuente"></p></details>
+    </div>
+  </div>
+
+  <div id="tarjeta" hidden></div>
+
+  <div id="navCap">
+    <button class="btn" type="button" id="btnAnt">Anterior</button>
+    <button class="btn" type="button" id="btnRep" title="Ver de nuevo" aria-label="Ver de nuevo">&#8635;</button>
+    <button class="btn prim" type="button" id="btnSig">Siguiente</button>
+  </div>
+</aside>
+
+<div id="leyenda" aria-live="polite">
+  <div id="leyTitulo"></div>
+  <div id="leyEscala">
+    <div id="barraColor"></div>
+    <div id="extremos"><span id="extIzq"></span><span id="extDer"></span></div>
+    <p id="leyPalabras"></p>
+  </div>
+  <div id="simbolos"></div>
+</div>
+
+<div id="selector" hidden role="dialog" aria-modal="true" aria-labelledby="selTit">
+  <div class="caja">
+    <h2 id="selTit">Tres formas de recorrerlo</h2>
+    <p class="sub">Las tres muestran mediciones reales del radar NISAR. Cambia cómo se cuentan.</p>
+    <div id="opciones">
+      <button type="button" data-v="chicos"><i>8 a 13 años</i><b>Para chicos y chicas</b><span>NISAR, el satélite, te cuenta cómo mira la Tierra y por qué a veces tiembla. Para ver en clase o en familia.</span></button>
+      <button type="button" data-v="general"><i>Para todo público</i><b>General</b><span>El recorrido completo: qué midió NISAR en terremotos e inundaciones y qué tan seguro está de cada cosa.</span></button>
+      <button type="button" data-v="detalle"><i>Con datos técnicos</i><b>En detalle</b><span>Lo mismo, con los datos técnicos: productos del radar, fechas de cada pasada, métodos y fuentes.</span></button>
+    </div>
+    <button type="button" class="cerrar" id="selCerrar">Volver</button>
+  </div>
+</div>
+
+<div id="corte" hidden aria-label="Arrastrá para comparar"><span id="corteIzq"></span><b></b><span id="corteDer"></span></div>
+<div id="tip" hidden></div>
+<div id="aviso" role="alert"><div id="avisoTxt"></div></div>
+
+<script>
+  const CFG = window.LANDSENSE_CONFIG || {};
+  /* idioma. ?lang=en muestra en ingles la portada, el modo de 90 segundos, Explorar (globo, tarjetas, leyenda) y las fuentes.
+     Los recorridos completos y las fichas de las escenas siguen en castellano (salen de punto.json). */
+  const EN = new URLSearchParams(location.search).get("lang") === "en";
+  const T = (es, en) => EN ? en : es;
+  if (EN) document.documentElement.lang = "en";
+  const MESES_EN = {enero: "January", febrero: "February", marzo: "March", abril: "April", mayo: "May", junio: "June", julio: "July",
+    agosto: "August", septiembre: "September", octubre: "October", noviembre: "November", diciembre: "December"};
+  /* "19 de octubre de 2026" -> "October 19, 2026" (solo en ingles) */
+  const F = t => !EN || !t ? t : String(t).replace(/(\d{1,2}) de ([a-zñ]+)(?: de (\d{4}))?/g, (m, d, mes, a) => MESES_EN[mes] ? `${MESES_EN[mes]} ${d}${a ? ", " + a : ""}` : m);
+  const globoListo = () => document.body.classList.remove("cargando");
+  setTimeout(globoListo, 12000);                     // si algo falla, igual se muestra
+  if (CFG.cesiumToken && !CFG.cesiumToken.startsWith("PEGAR")) {
+    Cesium.Ion.defaultAccessToken = CFG.cesiumToken;
+  } else {
+    console.warn("LandSense: falta web/config.js con tu token de Cesium ion (ver config.example.js). Sin token el terreno y el mapa de fondo no cargan.");
+  }
+
+  const terreno = Cesium.Terrain.fromWorldTerrain();
+  const terrenoListo = new Promise(r => { terreno.readyEvent.addEventListener(r); terreno.errorEvent.addEventListener(r); });
+  const viewer = new Cesium.Viewer("globo", {
+    terrain: terreno,
+    baseLayerPicker: false, timeline: false, animation: false, geocoder: false, homeButton: false,
+    sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false,
+    infoBox: false, selectionIndicator: false,
+    requestRenderMode: true, maximumRenderTimeChange: Infinity,     // dibuja solo cuando algo cambia (mucho menos lag)
+    useBrowserRecommendedResolution: false                          // usar la densidad real de la pantalla (si no, en celular se ve borroso)
+  });
+  { let hubo = false;                                  // el planeta aparece cuando terminan de bajar sus primeras imagenes
+    viewer.scene.globe.tileLoadProgressEvent.addEventListener(n => { if (n > 0) hubo = true; else if (hubo) globoListo(); }); }
+  const ES_MOVIL = matchMedia("(max-width: 760px)").matches || (navigator.maxTouchPoints > 0 && innerWidth < 1100);
+  const redibujar = () => viewer.scene.requestRender();
+  /* lineas nuevas: Cesium las arma en segundo plano y con requestRenderMode nadie pide dibujarlas cuando estan listas */
+  function redibujarLuego(){
+    const t0 = performance.now();
+    const cuadro = () => {
+      redibujar();
+      const t = performance.now() - t0;
+      if (t < 2000 || (!viewer.dataSourceDisplay.ready && t < 10000)) requestAnimationFrame(cuadro);
+    };
+    requestAnimationFrame(cuadro);
+  }
+  /* CALIDAD. Alta (por defecto): hasta 2 pixeles reales por pixel de pantalla y terreno con detalle normal;
+     en celular baja a 1,25 solo mientras el mapa se mueve y vuelve a alta al quedarse quieto.
+     Ahorro (boton HD apagado): 1 pixel por pixel y menos terreno (lo que hacia Cesium por defecto). */
+  let calidadAlta = true, moviendo = false, tQuieto = null;
+  try { calidadAlta = localStorage.getItem("tp_calidad") !== "ahorro"; } catch(e){}
+  function aplicarCalidad(){
+    const dpr = window.devicePixelRatio || 1;
+    const meta = !calidadAlta ? 1 : (moviendo && ES_MOVIL ? Math.min(dpr, 1.25) : Math.min(dpr, 2));
+    const rs = meta / dpr;
+    if (Math.abs(viewer.resolutionScale - rs) > 1e-3) viewer.resolutionScale = rs;
+    viewer.scene.globe.maximumScreenSpaceError = calidadAlta ? 2 : 4;
+    viewer.scene.fog.screenSpaceErrorFactor = calidadAlta ? 2 : 4;
+    const b = document.getElementById("btnCalidad"); if (b) b.setAttribute("aria-pressed", calidadAlta);
+    redibujar();
+  }
+  function alternarCalidad(){
+    calidadAlta = !calidadAlta;
+    try { localStorage.setItem("tp_calidad", calidadAlta ? "alta" : "ahorro"); } catch(e){}
+    aplicarCalidad();
+  }
+  viewer.camera.moveStart.addEventListener(() => { clearTimeout(tQuieto); if (!moviendo && ES_MOVIL){ moviendo = true; aplicarCalidad(); } });
+  viewer.camera.moveEnd.addEventListener(() => { clearTimeout(tQuieto); tQuieto = setTimeout(() => { if (moviendo){ moviendo = false; aplicarCalidad(); } }, 250); });
+  /* con requestRenderMode, moveEnd no siempre llega (si no se dibuja, Cesium no ve que la camara paro): lo vigilamos a mano */
+  let vistaPrevia = null;
+  setInterval(() => {
+    if (!moviendo) { vistaPrevia = null; return; }
+    const v = Cesium.Matrix4.clone(viewer.camera.viewMatrix);
+    if (vistaPrevia && Cesium.Matrix4.equalsEpsilon(v, vistaPrevia, 1e-7)){ moviendo = false; aplicarCalidad(); }
+    vistaPrevia = v;
+  }, 300);
+  aplicarCalidad();
+  const PANTALLA_CHICA = () => innerWidth <= 760;
+  /* en celular el panel ocupa la mitad de abajo: subimos lo que se mira a la mitad de arriba */
+  function encuadrar(desplazar){
+    if (PANTALLA_CHICA()) viewer.camera.lookDown(0.32);
+    else if (version === "cine") viewer.camera.lookDown(0.07);      // el texto va abajo: subimos un poco lo que se mira
+    else if (desplazar) viewer.camera.lookLeft(desplazar);
+    redibujar();
+  }
+  viewer.scene.globe.enableLighting = false;
+  viewer.scene.globe.depthTestAgainstTerrain = true;
+  viewer.scene.skyAtmosphere.show = true;
+  const $ = id => document.getElementById(id);
+  const txt = (id, t) => $(id).textContent = t || "";
+  const MOVIMIENTO_REDUCIDO = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------------- semaforo ---------------- */
+  const SEM = {
+    verde:    {css: "#5DBB7E", nombre: T("Verificado o validado", "Verified or validated")},
+    amarillo: {css: "#E6B83A", nombre: T("Indicio: falta confirmar", "Indication: not yet confirmed")},
+    azul:     {css: "#5AA8E3", nombre: T("Esperando la próxima pasada", "Waiting for the next pass")},
+    gris:     {css: "#8D989F", nombre: T("NISAR no puede medirlo", "NISAR cannot measure it")},
+  };
+  const ESTADO_COLOR = {VERIFICADO: "verde", VALIDADO: "verde"};
+
+  /* puntos de agua (fuera del catalogo de sismos). Estado tal como quedo en la revision de cada caso. */
+  const AGUA = [
+    {id: "agua_delta", nombre: "Delta del Paraná, Argentina", lon: -59.05, lat: -33.85, color: "verde",
+     estado: "Validado", escena: "delta_parana",
+     cuando: "Agosto de 2026"},
+    {id: "agua_libres", nombre: "Río Uruguay en Paso de los Libres, Argentina", lon: -57.09, lat: -29.71, color: "amarillo",
+     estado: "Indicio fuerte", escena: "libres", cuando: "Octubre de 2026",
+     titular: "El río Uruguay salió de su cauce y NISAR lo vio con el cielo cubierto",
+     texto: "El 11 de octubre el satélite óptico de NASA no podía ver el suelo: 0 % de cielo despejado. El radar sí. En las zonas donde NISAR marcó agua nueva junto al río, el mapa de agua de NASA hecho con otro radar (Sentinel-1) pasó de 1 % a 53 % de agua; en las zonas sin cambio casi no se movió.",
+     ojo: "Todavía es un indicio: nuestra prueba de control (una fecha sin crecida) también marcó algunos campos arados, apenas por encima de lo que habíamos fijado como tolerable. Después hicimos la prueba a ciegas en la crecida del Paraná en Chaco, y ahí sí pasó."},
+    {id: "agua_apipe", nombre: "Yacyretá e isla Apipé, río Paraná", lon: -56.75, lat: -27.50, color: "azul",
+     estado: "Solo imagen, sin analizar", escena: "apipe", cuando: "Octubre de 2026",
+     titular: "El Paraná crece aguas abajo de Yacyretá",
+     texto: "Acá solo mostramos la imagen del radar, sin análisis. La prueba a ciegas del método se hizo aguas abajo, en el Gran Resistencia (Chaco), y pasó."},
+    {id: "agua_chaco", nombre: "Ríos Paraná y Paraguay en el Gran Resistencia, Chaco", lon: -58.80, lat: -27.33, color: "verde",
+     estado: "Validado", escena: "chaco", cuando: "Octubre de 2026, durante El Niño",
+     titular: "Durante El Niño, el Paraná y el Paraguay entraron en las islas, y NISAR lo vio con el cielo nublado",
+     texto: "Dos pasadas de NISAR (16 y 19 de octubre) marcaron agua nueva en las islas de Isla del Cerrito y frente a Barranqueras. Las fotos satelitales de NASA lo confirman: en las zonas marcadas el agua pasó de 13 % en agosto a 87 % el 19 de octubre.",
+     ojo: "Fue una prueba a ciegas: la regla se fijó antes de mirar los datos. NISAR ve islas y bañados inundados, no calles ni casas."},
+  ];
+
+  /* ---------------- iconos del globo ---------------- */
+  function icono(css, forma){
+    const c = document.createElement("canvas"); c.width = c.height = 40;
+    const g = c.getContext("2d"); g.fillStyle = css; g.strokeStyle = "#07131B"; g.lineWidth = 4;
+    g.beginPath();
+    if (forma === "rombo"){ g.moveTo(20, 3); g.lineTo(37, 20); g.lineTo(20, 37); g.lineTo(3, 20); g.closePath(); }
+    else g.arc(20, 20, 16, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    return c.toDataURL();
+  }
+  const ICONOS = {};
+  Object.entries(SEM).forEach(([k, v]) => { ICONOS[k] = icono(v.css, "circulo"); ICONOS[k + "_agua"] = icono(v.css, "rombo"); });
+
+  const DIR = {N: "norte", S: "sur", E: "este", W: "oeste", NE: "noreste", NW: "noroeste", SE: "sureste", SW: "suroeste",
+    NNE: "nor-noreste", ENE: "este-noreste", ESE: "este-sureste", SSE: "sur-sureste", SSW: "sur-suroeste", WSW: "oeste-suroeste",
+    WNW: "oeste-noroeste", NNW: "nor-noroeste"};
+  const PAIS = {Japan: "Japón", "Papua New Guinea": "Papúa Nueva Guinea", Russia: "Rusia", Philippines: "Filipinas", Mexico: "México",
+    Panama: "Panamá", "New Caledonia": "Nueva Caledonia", "Timor Leste": "Timor Oriental"};
+  const LUGAR = {"Scotia Sea": "mar de Scotia", "South Sandwich Islands region": "región de las islas Sandwich del Sur",
+    "central Mid-Atlantic Ridge": "dorsal mesoatlántica central", "southeast of Easter Island": "al sureste de la isla de Pascua",
+    "southeast of the Loyalty Islands": "al sureste de las islas de la Lealtad", "The 2026 Kumamoto Region, Japan Earthquake": "Kumamoto, Japón"};
+  function lugarES(s){
+    if (EN) return s.replace(/^The 2026 Kumamoto Region, Japan Earthquake$/, "Kumamoto, Japan");
+    if (LUGAR[s]) return LUGAR[s];
+    const m = s.match(/^(\d+) km ([NSEW]{1,3}) of (.+)$/);
+    if (!m) return s;
+    const lugar = m[3].replace(/, ([^,]+)$/, (x, p) => ", " + (PAIS[p] || p));
+    return `${m[1]} km al ${DIR[m[2]] || m[2]} de ${lugar}`;
+  }
+
+  const fechaES = f => new Date(f + "T12:00:00Z").toLocaleDateString(EN ? "en-US" : "es-AR", {day: "numeric", month: "long"});
+  const num = x => EN ? String(x) : String(x).replace(".", ",");
+
+  /* ---------------- estado general ---------------- */
+  const dsGlobal = new Cesium.CustomDataSource("globo"); viewer.dataSources.add(dsGlobal);
+  const datosEnt = new Map();
+  let SISMOS = null, puntos = {}, modo = "portada", paso = 0;
+
+  /* ---------------- motor de escenas ---------------- */
+  let punto = null, puntoId = null, capas = {}, capaActiva = null, opacidad = 0.85, momento = "despues";
+  let entFlechas = [], entFalla = [], capaPob = null, capaDanio = null, entCampo = [], entEscena = [];
+  let iFecha = 0, reproduciendo = null;
+  let limiteFlechas = Infinity, limiteCampo = Infinity, flechasListas = Promise.resolve(), fechaTope = null;
+  const esSerie = () => punto && punto.tipo === "serie";
+
+  function avisar(t){ txt("avisoTxt", t); $("aviso").style.display = "flex"; }
+
+  let primitivasExtra = [];                 // dibujos sueltos de un paso (p. ej. la flecha de las placas)
+  function limpiarEscena(){
+    detenerOrbita(); pararSerie();
+    quitarFlujo();
+    primitivasExtra.forEach(p => viewer.scene.primitives.remove(p)); primitivasExtra = [];
+    Object.values(capas).flat().forEach(l => viewer.imageryLayers.remove(l, true));
+    if (capaPob){ viewer.imageryLayers.remove(capaPob, true); capaPob = null; }
+    if (capaDanio){ viewer.imageryLayers.remove(capaDanio, true); capaDanio = null; }
+    viewer.entities.removeAll();
+    capas = {}; entFlechas = []; entFalla = []; entCampo = []; entEscena = [];
+    comparando = false; $("corte").hidden = true;
+    punto = null; puntoId = null;
+    $("ficha").hidden = true;
+    dsGlobal.show = true;
+    leyendaGlobal(); redibujar();
+  }
+
+  async function mostrarPunto(id, opc = {}){
+    if (puntoId === id && punto) return;
+    limpiarEscena();
+    if (modo !== "recorrido"){            // en Explorar se arranca siempre igual (el recorrido deja otros valores)
+      opacidad = 0.85; $("opacidad").value = 85;
+      Object.entries({chkFlechas: true, chkFalla: true, chkPob: false, chkDanio: false, chkCampo: false}).forEach(([k, v]) => $(k).checked = v);
+    }
+    dsGlobal.show = false;
+    punto = puntos[id]; puntoId = id; iFecha = 0;
+    const b = punto.bounds, rect = Cesium.Rectangle.fromDegrees(b.west, b.south, b.east, b.north);
+    const cache = {};                     // un mismo archivo (p. ej. vacio.png) se pide una sola vez
+    const pedir = a => cache[a] || (cache[a] = Cesium.SingleTileImageryProvider.fromUrl(`puntos/${id}/${a}`, {rectangle: rect}));
+    const listas = punto.capas.map(c => (c.archivos || (c.momentos ? [c.momentos.antes, c.momentos.despues] : [c.archivo])));
+    const provs = await Promise.all(listas.map(l => Promise.all(l.map(pedir))));   // todo en paralelo
+    if (puntoId !== id) return;
+    punto.capas.forEach((c, i) => {
+      capas[c.id] = provs[i].map(prov => {
+        const layer = viewer.imageryLayers.addImageryProvider(prov);
+        layer.show = false; layer.alpha = opacidad;
+        if (c.archivos && c.id !== "ojos") layer.magnificationFilter = Cesium.TextureMagnificationFilter.NEAREST;
+        return layer;
+      });
+    });
+    $("filaFlechas").hidden = !punto.flechas;
+    $("filaFalla").hidden = !(punto.falla || punto.epicentros);
+    $("grupoMomento").hidden = esSerie();
+    $("grupoSerie").hidden = !esSerie();
+    if (esSerie()) $("serieFecha").max = punto.fechas.length - 1;
+    dibujarMarcadores(); dibujarFalla(); flechasListas = dibujarFlechas();
+
+    const P = punto.poblacion;
+    $("filaPob").hidden = !P; $("pobTxt").hidden = !P;
+    if (P){
+      const pb = P.bounds;
+      const prov = await Cesium.SingleTileImageryProvider.fromUrl(`puntos/${id}/${P.archivo}`,
+        {rectangle: Cesium.Rectangle.fromDegrees(pb.west, pb.south, pb.east, pb.north)});
+      capaPob = viewer.imageryLayers.addImageryProvider(prov);
+      capaPob.show = false; capaPob.alpha = 0.85;
+      capaPob.magnificationFilter = Cesium.TextureMagnificationFilter.NEAREST;
+      txt("pobTxt", P.texto + " Es exposición cerca de la ruptura, no un conteo de afectados.");
+    }
+    const D = punto.danio;
+    ["filaDanio", "danioTxt"].forEach(i => $(i).hidden = !D);
+    $("filaCampo").hidden = !(D && D.campo);
+    if (D){
+      const db = D.bounds;
+      const provD = await Cesium.SingleTileImageryProvider.fromUrl(`puntos/${id}/${D.archivo}`,
+        {rectangle: Cesium.Rectangle.fromDegrees(db.west, db.south, db.east, db.north)});
+      capaDanio = viewer.imageryLayers.addImageryProvider(provD);
+      capaDanio.show = false; capaDanio.alpha = 0.9;
+      capaDanio.magnificationFilter = Cesium.TextureMagnificationFilter.NEAREST;
+      txt("danioTxt", D.texto + " " + D.validacion);
+      const COL = {complete: "#111111", significant: "#2166ac", minimal: "#67a9cf"};
+      const NOMBRE = {complete: "Derrumbe completo", significant: "Daño importante", minimal: "Daño menor"};
+      (D.campo?.puntos || []).forEach(q => {
+        const e = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(q.lon, q.lat),
+          point: {pixelSize: 7, color: Cesium.Color.fromCssColorString(COL[q.cat] || "#111111"),
+                  outlineColor: Cesium.Color.WHITE, outlineWidth: 1.5,
+                  heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY},
+          show: false});
+        e._orden = q.lon;
+        datosEnt.set(e.id, {tipo: "tip", texto: `${NOMBRE[q.cat] || "Daño"}, constatado por voluntarios en el terreno (HOT). La imagen de fondo es de otra fecha y no muestra el daño.`});
+        entCampo.push(e);
+      });
+      entCampo.sort((a, b) => a._orden - b._orden);         // en el recorrido aparecen de oeste a este
+    }
+
+    txt("nombre", punto.nombre + (punto.lugar ? ` · ${punto.lugar}` : ""));
+    txt("titular", punto.titular || punto.nombre); txt("queEs", punto.que_es);
+    const color = punto.color || ESTADO_COLOR[punto.estado] || "amarillo";
+    const est = $("estado");
+    est.textContent = {VERIFICADO: "Verificado", VALIDADO: "Validado"}[punto.estado] || punto.estado;
+    est.style.setProperty("--c", SEM[color].css);
+    txt("estadoDet", punto.estado_detalle); txt("resultado", punto.resultado);
+    dibujarGrafico(punto.grafico);
+    txt("fAntes", punto.fecha_antes); txt("fDespues", punto.fecha_despues);
+
+    const lims = [...punto.limites,
+      "La imagen satelital de fondo es de otra fecha: no muestra lo que midió el radar. Los datos son solo las capas de color."];
+    if (punto.poblacion) lims.push(...punto.poblacion.limites);
+    if (punto.danio) lims.push(...punto.danio.limites);
+    if (punto.flechas) lims.push(punto.flechas.nota);
+    if (punto.falla) lims.push(punto.falla.nota);
+    (punto.epicentros || []).filter(e => !e.dentro).forEach(e =>
+      lims.push(`El sismo M${num(e.mag)} (${e.lugar}, según USGS) ocurrió fuera de la zona que medimos en detalle: se marca su epicentro, pero el mapa de colores no llega hasta ahí.`));
+    $("limites").innerHTML = lims.map(t => `<li>${t}</li>`).join("");
+    const fuentes = [`${punto.satelite}. ${punto.pares}. ${punto.evento}.`];
+    if (punto.epicentros) fuentes.push("Epicentros: catálogo USGS (" + punto.epicentros.map(e => e.id).join(", ") + ").");
+    if (punto.falla) fuentes.push(punto.falla.fuente);
+    if (punto.poblacion) fuentes.push("Población: " + punto.poblacion.fuente + ".");
+    if (punto.danio) fuentes.push("Zonas de derrumbe: " + punto.danio.fuente, punto.danio.campo?.fuente || "");
+    $("fuente").innerHTML = fuentes.map(f => `${f}<br>`).join("");
+
+    const cont = $("capas"); cont.innerHTML = "";
+    punto.capas.forEach(c => {
+      const bt = document.createElement("button");
+      bt.type = "button"; bt.textContent = c.nombre; bt.dataset.id = c.id;
+      bt.onclick = () => activarCapa(c.id);
+      cont.appendChild(bt);
+    });
+    $("grupoMostrar").hidden = !(punto.flechas || punto.falla || punto.epicentros || P || D);
+    $("ficha").hidden = false;
+    $("volver").hidden = modo === "recorrido";
+
+    activarCapa(punto.inicio?.capa || punto.capas[0].id);
+    if (esSerie()) ponerFecha(Math.max(0, punto.fechas.indexOf(punto.inicio?.fecha)));
+    else ponerMomento("despues");
+    if (!opc.sinVuelo) mirar("3d", true);
+  }
+
+  function fechaNum(f){ return Date.UTC(+f.slice(0, 4), +f.slice(4, 6) - 1, +f.slice(6, 8)); }
+  let grafEscalaX = null, grafCont = null;
+  function dibujarGrafico(G){
+    const enRec = modo === "recorrido" && $("grafRec");
+    const cont = enRec ? $("grafRec") : $("grafico");
+    $("grafico").innerHTML = ""; $("grafico").hidden = true;      // un solo grafico vivo
+    cont.hidden = !G; grafEscalaX = null; grafCont = cont;
+    if (!G){ cont.innerHTML = ""; return; }
+    const W = 300, H = 160, m = {l: 30, r: 8, t: 8, b: 22};
+    const x0 = fechaNum(G.desde), x1 = fechaNum(G.hasta);
+    const ymax = Math.max(75, ...G.series.flatMap(s => s.puntos.map(p => p[1])));
+    const X = f => m.l + (fechaNum(f) - x0) / (x1 - x0) * (W - m.l - m.r);
+    const Y = v => H - m.b - v / ymax * (H - m.t - m.b);
+    grafEscalaX = X;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${G.titulo}">`;
+    if (G.hueco) svg += `<rect x="${X(G.hueco[0])}" y="${m.t}" width="${X(G.hueco[1]) - X(G.hueco[0])}" height="${H - m.t - m.b}" fill="#f6b73c" opacity=".2"/>`;
+    for (let v = 0; v <= ymax; v += 25){
+      svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#d9ddd6"/>` +
+             `<text x="${m.l - 4}" y="${Y(v) + 3.5}" font-size="9" text-anchor="end" fill="#555">${v}%</text>`;
+    }
+    [["20260701", "jul"], ["20260801", "ago"], ["20260901", "sep"]].forEach(([f, t]) => {
+      svg += `<line x1="${X(f)}" x2="${X(f)}" y1="${H - m.b}" y2="${H - m.b + 4}" stroke="#999"/>` +
+             `<text x="${X(f)}" y="${H - 6}" font-size="9" text-anchor="middle" fill="#555">${t}</text>`;
+    });
+    G.series.forEach(s => {
+      const pts = s.puntos.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+      svg += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" ${s.punteada ? 'stroke-dasharray="4 3"' : ""}/>`;
+      s.puntos.forEach(p => svg += `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="2.3" fill="${s.color}"><title>${s.nombre}: ${p[1]}% (${p[0].slice(6)}/${p[0].slice(4, 6)})</title></circle>`);
+    });
+    svg += `<line class="grafCursor" y1="${m.t}" y2="${H - m.b}" stroke="#111" stroke-width="1.5" opacity=".7"/></svg>`;
+    cont.innerHTML = `<p class="gtit">${G.titulo}</p>${svg}` +
+      `<div class="gley"><span><i style="background:#2166ac"></i>zonas que marcó NISAR</span>` +
+      `<span><i style="background:#8a8a8a"></i>zonas sin cambio</span>` +
+      `<span><i style="background:#111"></i>pasada que estás viendo</span></div>` +
+      `<p class="gnota">${G.nota}</p>`;
+  }
+  function moverCursor(){
+    const c = grafCont && grafCont.querySelector(".grafCursor");
+    if (!c || !grafEscalaX || !esSerie()) return;
+    const x = grafEscalaX(punto.fechas[iFecha]);
+    c.setAttribute("x1", x); c.setAttribute("x2", x);
+  }
+  function ponerFecha(i){
+    iFecha = i;
+    $("serieFecha").value = i;
+    const c = punto.capas.find(x => x.id === capaActiva);
+    const f = punto.fechas_texto[i];
+    if (c && c.texto_fecha) txt("serieTxt", c.texto_fecha.replace("{f}", f));
+    else txt("serieTxt", capaActiva === "cambio"
+      ? `${f} (pasada ${i + 1} de ${punto.fechas.length}): cuánto cambió el eco respecto de ${punto.fecha_referencia}.`
+      : `${f} (pasada ${i + 1} de ${punto.fechas.length}): el eco que recibió el radar ese día.`);
+    if ($("subt")) txt("subt", $("serieTxt").textContent);
+    moverCursor(); actualizarVisibles(); actualizarLeyenda();
+  }
+  function pararSerie(){
+    if (reproduciendo){ clearInterval(reproduciendo); reproduciendo = null; }
+    $("btnPlay").textContent = "Reproducir";
+  }
+  function alternarSerie(){
+    if (reproduciendo){ pararSerie(); return; }
+    $("btnPlay").textContent = "Pausa";
+    if (iFecha >= punto.fechas.length - 1) ponerFecha(0);
+    reproduciendo = setInterval(() => {
+      if (iFecha >= punto.fechas.length - 1){ pararSerie(); return; }
+      ponerFecha(iFecha + 1);
+    }, 1300);
+  }
+  function etiqueta(t){
+    return {text: t, font: "15px Atkinson Hyperlegible, sans-serif", fillColor: Cesium.Color.WHITE,
+      outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      pixelOffset: new Cesium.Cartesian2(0, -18), heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY};
+  }
+  const CERCA = new Cesium.DistanceDisplayCondition(0, 200000);   /* marcadores de lugar: solo de cerca (< 200 km) */
+  function dibujarMarcadores(){
+    (punto.marcadores || []).forEach(m => viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(m.lon, m.lat),
+      point: {pixelSize: 9, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              distanceDisplayCondition: CERCA},
+      label: {...etiqueta(m.nombre), distanceDisplayCondition: CERCA}}));   /* de lejos se encimaba con el epicentro */
+    (punto.epicentros || []).forEach(e => entFalla.push(viewer.entities.add({   /* tambien los de fuera del mapa medido (San Felipe) */
+      position: Cesium.Cartesian3.fromDegrees(e.lon, e.lat),
+      point: {pixelSize: 14, color: Cesium.Color.fromCssColorString("#E0301E"), outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 3, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY},
+      label: etiqueta(`Epicentro M${num(e.mag)} (USGS)`)})));
+  }
+  function dibujarFalla(){
+    if (!punto.falla) return;
+    entFalla.push(viewer.entities.add({
+      polyline: {positions: Cesium.Cartesian3.fromDegreesArray(punto.falla.puntos.flat()), width: 4, clampToGround: true,
+                 material: new Cesium.PolylineDashMaterialProperty({color: Cesium.Color.fromCssColorString("#111111"),
+                   gapColor: Cesium.Color.WHITE.withAlpha(0.85), dashLength: 18})}}));
+  }
+  async function dibujarFlechas(){
+    if (!punto.flechas) return;
+    const yo = puntoId, N = 6;
+    await Promise.race([terrenoListo, new Promise(r => setTimeout(r, 8000))]);
+    const cartos = punto.flechas.datos.flatMap(f => Array.from({length: N}, (_, k) =>
+      Cesium.Cartographic.fromDegrees(f.lon + (f.lon2 - f.lon) * k / (N - 1), f.lat)));
+    try { await Cesium.sampleTerrain(viewer.terrainProvider, 12, cartos); } catch(e){ cartos.forEach(c => c.height = c.height || 0); }
+    if (puntoId !== yo) return;                       // el usuario ya cambio de escena
+    /* flechas negras: el mapa va de azul a blanco a rojo y las blancas se perdian en lo blanco.
+       (Un borde blanco debajo no sirve: Cesium mezcla las dos flechas, que son translucidas, y salen grises.) */
+    const NEGRA = Cesium.Color.fromCssColorString("#0a0a0a");
+    const mat = new Cesium.PolylineArrowMaterialProperty(NEGRA);
+    punto.flechas.datos.forEach((f, i) => {
+      const pos = cartos.slice(i * N, i * N + N).map(c => Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, (c.height || 0) + 80));
+      const e = viewer.entities.add({polyline: {positions: pos, width: PANTALLA_CHICA() ? 8 : 14, arcType: Cesium.ArcType.NONE, material: mat,
+        depthFailMaterial: new Cesium.PolylineArrowMaterialProperty(NEGRA.withAlpha(0.6))}});
+      datosEnt.set(e.id, {tipo: "tip", texto: T(`Acá el suelo se movió ${Math.abs(f.cm)} cm hacia el ${f.cm < 0 ? "oeste" : "este"}.`, `Here the ground moved ${Math.abs(f.cm)} cm to the ${f.cm < 0 ? "west" : "east"}.`)});
+      e._orden = f.lon; entFlechas.push(e);
+    });
+    entFlechas.sort((a, b) => a._orden - b._orden);
+    armarFlujo();
+    actualizarVisibles();
+  }
+  /* "flujo" sobre las flechas. Puntos claros que corren de la cola a la punta de cada flecha, una y otra vez,
+     para que se vea HACIA DONDE se movio el suelo. Es una ayuda visual: el dato sigue siendo la flecha (direccion y largo).
+     Todos tardan lo mismo en recorrer su flecha, asi que donde el suelo se movio mas, el punto va mas rapido. */
+  let flujo = null, flujoTick = null, flujoActivo = false;
+  function quitarFlujo(){ if (flujoTick){ flujoTick(); flujoTick = null; } flujo = null; flujoActivo = false; }
+  function armarFlujo(){
+    quitarFlujo();
+    if (MOVIMIENTO_REDUCIDO || !entFlechas.length) return;
+    const COLA = 4, PERIODO = 2400, CLARO = Cesium.Color.fromCssColorString("#E9FF8A"), BORDE = Cesium.Color.fromCssColorString("#0a0a0a");
+    flujo = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection()); primitivasExtra.push(flujo);
+    const tam = PANTALLA_CHICA() ? 5 : 7, tmp = new Cesium.Cartesian3();
+    entFlechas.forEach((e, i) => {
+      e._pos = e.polyline.positions.getValue(Cesium.JulianDate.now());
+      e._fase = i / entFlechas.length * 1.6;                     // ola de oeste a este
+      e._pts = Array.from({length: COLA}, (_, k) => flujo.add({position: e._pos[0], show: false, pixelSize: tam * (1 - k * 0.18),
+        color: CLARO, outlineColor: BORDE, outlineWidth: k ? 0 : 2, disableDepthTestDistance: Number.POSITIVE_INFINITY}));
+    });
+    const sobre = (pos, u) => {                                    // punto a la fraccion u (0..1) del recorrido
+      const x = Math.max(0, Math.min(0.9999, u)) * (pos.length - 1), j = Math.floor(x);
+      return Cesium.Cartesian3.lerp(pos[j], pos[j + 1], x - j, tmp);
+    };
+    flujoTick = viewer.clock.onTick.addEventListener(() => {
+      if (!flujo) return;
+      const t = performance.now() / PERIODO;
+      let alguno = false;
+      entFlechas.forEach(e => {
+        const ver = e.show && !comparando;
+        if (ver) alguno = true;
+        const u0 = (t + e._fase) % 1;
+        e._pts.forEach((p, k) => {
+          const u = u0 - k * 0.07;
+          p.show = ver && u > 0;
+          if (!p.show) return;
+          p.position = sobre(e._pos, u);
+          p.color = CLARO.withAlpha(Math.sin(Math.PI * u) * (1 - k * 0.2));
+        });
+      });
+      if (alguno || flujoActivo) redibujar();                      // un cuadro mas al apagarse, para borrar los puntos
+      flujoActivo = alguno;
+    });
+  }
+  let iIzq = 0;   // serie: fecha del lado izquierdo del comparador (por defecto la primera)
+  const ALFA_PRECARGA = 0.003;   // invisible a la vista, pero Cesium mantiene la imagen armada
+  function actualizarVisibles(){
+    if (!punto) return;
+    const despues = esSerie() || momento === "despues";
+    const cDef = id => punto.capas.find(x => x.id === id) || {};
+    Object.entries(capas).forEach(([k, ls]) => ls.forEach((l, j) => {
+      const mom = cDef(k).momentos;
+      const activa = k === capaActiva || cDef(capaActiva).sobre === k;      // "sobre": la capa se dibuja encima de otra
+      const ver = activa && (mom ? j === (momento === "antes" ? 0 : 1) : (despues && (!esSerie() || j === iFecha)));
+      /* serie: todas las fechas quedan cargadas en el mapa (casi transparentes) para que el cambio de fecha no titile
+         mostrando el mapa de fondo mientras Cesium arma la imagen nueva */
+      const precarga = activa && esSerie() && !mom && ls.length > 1;
+      l.show = ver || precarga;
+      l._oculta = !ver;
+      l.splitDirection = Cesium.SplitDirection.NONE;
+      if (l._oculta) l.alpha = ALFA_PRECARGA;
+      else if (!animando) l.alpha = opacidad;
+    }));
+    if (comparando && capas[capaActiva]?.length > 1){
+      const ls = capas[capaActiva];
+      const izq = esSerie() ? ls[iIzq] || ls[0] : ls[0], der = esSerie() ? ls[iFecha] : ls[1];
+      ls.forEach(l => { l.show = false; l._oculta = true; });
+      izq.show = der.show = true; izq._oculta = der._oculta = false; izq.alpha = der.alpha = opacidad;
+      if (izq !== der){ izq.splitDirection = Cesium.SplitDirection.LEFT; der.splitDirection = Cesium.SplitDirection.RIGHT; }
+      const mo = cDef(capaActiva).momentos;
+      const fx = esSerie() ? [punto.fechas_texto[ls[iIzq] ? iIzq : 0], punto.fechas_texto[iFecha]]
+               : mo ? [fechaArchivo(mo.antes), fechaArchivo(mo.despues)] : [punto.fecha_antes, punto.fecha_despues];
+      txt("corteIzq", F(fx[0])); txt("corteDer", F(fx[1]));
+    }
+    entFlechas.forEach((e, i) => { e.show = despues && capaActiva === "este_oeste" && $("chkFlechas").checked && i < limiteFlechas });
+    entFalla.forEach(e => e.show = $("chkFalla").checked);
+    if (capaPob) capaPob.show = despues && $("chkPob").checked;
+    if (capaDanio) capaDanio.show = despues && $("chkDanio").checked;
+    entCampo.forEach((e, i) => e.show = despues && $("chkCampo").checked && i < limiteCampo);
+    redibujar();
+    $("pobTxt").hidden = !(punto.poblacion && $("chkPob").checked);
+    $("danioTxt").hidden = !(punto.danio && $("chkDanio").checked);
+  }
+  function ponerMomento(m){
+    momento = m;
+    document.querySelectorAll("#momento button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === m));
+    const fa = punto.fecha_antes || "la primera pasada del radar", fd = punto.fecha_despues || "la segunda pasada";
+    const cm = punto.capas.find(x => x.id === capaActiva) || {};
+    txt("momentoTxt", cm.momentos ? (m === "antes" ? cm.texto_antes : cm.texto_despues) : m === "antes"
+      ? `Antes del sismo (${fa}): el punto de partida. Todavía no hay movimiento que mostrar.`
+      : `Después (${fd}): cuánto se movió el suelo respecto de ${fa}.`);
+    if ($("subt")) txt("subt", $("momentoTxt").textContent);
+    actualizarVisibles(); actualizarLeyenda();
+  }
+  function fechaArchivo(n){
+    const m = (n || "").match(/(\d{4})(\d{2})(\d{2})/);
+    return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00Z`).toLocaleDateString("es-AR", {day: "numeric", month: "long", year: "numeric"}) : "";
+  }
+  function activarCapa(id){
+    if (!punto) return;
+    if (!punto.capas.some(x => x.id === id)) id = punto.capas[0].id;          // capa de otra escena: usar la primera
+    capaActiva = id;
+    const cc = punto.capas.find(x => x.id === id) || {};
+    if (!esSerie()){                      // las fechas de Antes/Despues son las de la capa que se mira
+      txt("fAntes", cc.momentos ? fechaArchivo(cc.momentos.antes) : punto.fecha_antes);
+      txt("fDespues", cc.momentos ? fechaArchivo(cc.momentos.despues) : punto.fecha_despues);
+    }
+    $("btnComparar").hidden = $("btnComparar2").hidden = !(cc.momentos || (cc.archivos && cc.archivos.length > 1 && id !== "marcado"));
+    if (comparando && $("btnComparar").hidden) alternarComparar(false);
+    if (cc.momentos) ponerMomento(momento);
+    document.querySelectorAll("#capas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
+    if (esSerie()){ ponerFecha(iFecha); return; }
+    actualizarVisibles(); actualizarLeyenda();
+  }
+
+  /* ---------------- efectos: revelar y comparar ---------------- */
+  let animando = false, comparando = false;
+  function revelar(id){
+    if (!punto || !capas[id]) return;
+    activarCapa(id);
+    if (MOVIMIENTO_REDUCIDO) return;
+    const ls = capas[id].filter(l => l.show && !l._oculta), t0 = performance.now(), dur = 1500;
+    animando = true; ls.forEach(l => l.alpha = 0);
+    const paso_ = t => {
+      const k = Math.min(1, (t - t0) / dur), e = k * k * (3 - 2 * k);
+      ls.forEach(l => l.alpha = e * opacidad); redibujar();
+      if (k < 1) requestAnimationFrame(paso_); else animando = false;
+    };
+    requestAnimationFrame(paso_);
+  }
+  function alternarComparar(forzar){
+    comparando = typeof forzar === "boolean" ? forzar : !comparando;
+    $("corte").hidden = !comparando;
+    viewer.scene.splitPosition = 0.5; ubicarCorte();
+    [$("btnComparar"), $("btnComparar2")].forEach(b => b.textContent = comparando ? "Salir de la comparación" : "Comparar deslizando");
+    actualizarVisibles();
+  }
+  function ubicarCorte(){ $("corte").style.left = (viewer.scene.splitPosition * 100) + "%"; redibujar(); }
+  (() => {
+    const c = document.getElementById("corte"); let arrastrando = false;
+    c.addEventListener("pointerdown", e => { arrastrando = true; c.setPointerCapture(e.pointerId); });
+    c.addEventListener("pointermove", e => {
+      if (!arrastrando) return;
+      viewer.scene.splitPosition = Math.min(0.95, Math.max(0.05, e.clientX / innerWidth)); ubicarCorte();
+    });
+    c.addEventListener("pointerup", () => arrastrando = false);
+  })();
+
+  /* ---------------- leyenda ---------------- */
+  function leyendaGlobal(){
+    $("leyenda").style.opacity = 1;
+    txt("leyTitulo", T("Qué tan seguro está cada punto", "How sure each dot is"));
+    $("leyEscala").hidden = true; $("simbolos").hidden = false;
+    $("simbolos").style.borderTop = "0"; $("simbolos").style.paddingTop = "0"; $("simbolos").style.marginTop = "0";
+    $("simbolos").innerHTML = `<div class="sem">` +
+      Object.entries(SEM).map(([k, s]) => `<i style="--c:${s.css}"></i><span>${version === "chicos" && modo === "recorrido" ? SEM_CHICOS[k] : s.nombre}</span>`).join("") +
+      `</div><div class="sem" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--borde)">` +
+      `<i style="--c:#E8EEF0"></i><span>${T("Sismo (más grande = más fuerte)", "Earthquake (bigger = stronger)")}</span>` +
+      `<i class="rombo" style="--c:#E8EEF0"></i><span>${T("Crecida o inundación", "Flood")}</span></div>`;
+  }
+  function actualizarLeyenda(){
+    if (!punto) return leyendaGlobal();
+    $("leyEscala").hidden = false;
+    $("simbolos").style.cssText = "";
+    const c = punto.capas.find(x => x.id === capaActiva) || punto.capas[0], e = punto.escala_cm;
+    if (c.leyenda){
+      $("leyenda").style.opacity = 1;
+      txt("leyTitulo", c.leyenda.titulo);
+      $("barraColor").style.background = c.leyenda.gradiente;
+      txt("extIzq", c.leyenda.izq); txt("extDer", c.leyenda.der);
+      $("leyPalabras").innerHTML = c.leyenda.palabras + (c.id === "ojos" ? `<div class="solo-experto" style="margin-top:6px">Colores: <b>rojo</b> = HH (superficies, edificios), <b>verde</b> = HV (vegetación), <b>azul</b> = cociente HH/HV.</div>` : "");
+    } else {
+      $("barraColor").style.background = "";
+      $("leyenda").style.opacity = momento === "antes" ? 0.55 : 1;   // capas de movimiento: antes no hay dato
+      txt("leyTitulo", `Cuánto se movió el suelo: ${c.nombre.toLowerCase()} (cm)`);
+      txt("extIzq", `−${e} ${c.izquierda}`); txt("extDer", `+${e} ${c.derecha}`);
+      $("leyPalabras").innerHTML =
+        `<b style="color:var(--oeste)">Azul</b>: ${c.texto_izq || c.izquierda}.<br>` +
+        `<b style="color:var(--este)">Rojo</b>: ${c.texto_der || c.derecha}.<br>` +
+        `${c.texto_neutro ? c.texto_neutro.charAt(0).toUpperCase() + c.texto_neutro.slice(1) + "." : ""}`;
+    }
+    const sim = [];
+    const conFalla = $("chkFalla").checked, conFlechas = $("chkFlechas").checked && capaActiva === "este_oeste" && opacidad >= 0.05;
+    if (conFalla && punto.epicentros?.length) sim.push('<span class="sim epi"></span>epicentro (USGS)');
+    if (conFalla && punto.falla) sim.push('<span class="sim falla"></span>falla, trazo aproximado (USGS)');
+    if (conFlechas && punto.flechas) sim.push(`<span class="sim flecha"></span>hacia dónde se movió el suelo (largo ×${punto.flechas.exageracion.toLocaleString("es")})`);
+    if (punto.poblacion && $("chkPob").checked) sim.push('<span class="sim pob"></span>personas donde más se movió (más intenso = más gente)');
+    if (punto.danio && $("chkDanio").checked) sim.push('<span class="sim alta"></span>derrumbe probable: lo ven dos pasadas', '<span class="sim media"></span>derrumbe posible: una sola pasada');
+    if (punto.danio && $("chkCampo").checked) sim.push('<span class="sim campo"></span>daño confirmado en el terreno');
+    $("simbolos").innerHTML = sim.join("<br>");
+    $("simbolos").hidden = !sim.length;
+    if (version === "chicos" && modo === "recorrido"){          // leyenda con palabras de chicos
+      $("simbolos").innerHTML = $("simbolos").innerHTML.replace("epicentro (USGS)", "donde empezó el terremoto")
+        .replace("falla, trazo aproximado (USGS)", "la falla: donde se tocan las placas").replace(/ \(largo ×[^)]*\)/, "");
+      if (!c.leyenda) txt("leyTitulo", "Cuánto se movió el suelo");
+    }
+    if (opacidad < 0.05){ $("leyEscala").hidden = true; txt("leyTitulo", "Qué ves en el mapa"); }   // capa oculta (recorrido)
+    leyendaEnPanel();
+  }
+  /* en celular la leyenda flotante no entra: en el recorrido va una version corta dentro del panel */
+  function leyendaEnPanel(){
+    const L = $("leyRec"); if (!L) return;
+    if (modo !== "recorrido" || !PANTALLA_CHICA() || !punto){ L.innerHTML = ""; return; }
+    let h = "";
+    if (!$("leyEscala").hidden){
+      const bg = getComputedStyle($("barraColor")).backgroundImage;
+      h += `<div class="lt">${$("leyTitulo").textContent}</div><div class="lb" style="background-image:${bg}"></div>` +
+           `<div class="le"><span>${$("extIzq").textContent}</span><span>${$("extDer").textContent}</span></div>`;
+    }
+    if (!$("simbolos").hidden && $("simbolos").innerHTML) h += `<div class="ls">${$("simbolos").innerHTML}</div>`;
+    L.innerHTML = h;
+  }
+
+  /* ---------------- camara ---------------- */
+  function objetivo(){
+    const k = punto.camara;
+    return new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(k.lon, k.lat, 0), k.radio_m);
+  }
+  /* cam (opcional, recorrido): {lon, lat, radio_m, distancia_m, pitch, heading} que pisa la camara de la escena */
+  function mirar(m, desdeLejos, cam){
+    detenerOrbita();
+    const k = {...punto.camara, ...(cam || {})}, pitch = cam?.pitch ?? (m === "arriba" ? -89 : -35);
+    const lejos = desdeLejos && viewer.camera.positionCartographic.height > 3e5;
+    return new Promise(res => viewer.camera.flyToBoundingSphere(
+      new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(k.lon, k.lat, 0), k.radio_m), {
+      offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(k.heading || 0), Cesium.Math.toRadians(pitch), k.distancia_m),
+      duration: MOVIMIENTO_REDUCIDO ? 0 : (lejos ? 4 : 2.4), maximumHeight: lejos ? 6e6 : undefined,
+      complete: () => { encuadrar(0); res(); }, cancel: res}));
+  }
+  let orbita = null;
+  function alternarOrbita(){
+    if (orbita){ detenerOrbita(); return; }
+    const k = punto.camara, centro = objetivo().center;
+    $("btnOrbita").textContent = "Detener giro";
+    orbita = viewer.clock.onTick.addEventListener(() => viewer.camera.lookAt(centro,
+      new Cesium.HeadingPitchRange(viewer.camera.heading + 0.003, Cesium.Math.toRadians(-35), k.distancia_m)) || redibujar());
+  }
+  function detenerOrbita(){
+    if (orbita){ orbita(); orbita = null; viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY); }
+    $("btnOrbita").textContent = "Girar";
+  }
+  /* desplazar: gira la camara un poco a la izquierda para que el globo no quede debajo del panel */
+  function volarA(lon, lat, alto, seg = 2.6, desplazar = 0.09){
+    return new Promise(res => viewer.camera.flyTo({destination: Cesium.Cartesian3.fromDegrees(lon, lat, alto),
+      duration: MOVIMIENTO_REDUCIDO ? 0 : seg, complete: () => { encuadrar(desplazar); res(); }, cancel: res}));
+  }
+  let giro = null;
+  function girarGlobo(si){
+    if (giro){ giro(); giro = null; }
+    if (si && !MOVIMIENTO_REDUCIDO) giro = viewer.clock.onTick.addEventListener(() =>
+      { viewer.scene.camera.rotate(Cesium.Cartesian3.UNIT_Z, -0.0007); redibujar(); });
+  }
+
+  /* ---------------- globo: sismos y agua ---------------- */
+  function dibujarGlobal(){
+    SISMOS.sismos.forEach(s => {
+      const e = dsGlobal.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, 9000),
+        billboard: {image: ICONOS[s.color], scale: 0.32 + (s.mag - 6) * 0.22, eyeOffset: new Cesium.Cartesian3(0, 0, -60000)}});
+      datosEnt.set(e.id, {tipo: "sismo", d: s});
+    });
+    AGUA.filter(a => !a.escena || puntos[a.escena] || a.texto).forEach(a => {
+      const e = dsGlobal.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(a.lon, a.lat, 9000),
+        billboard: {image: ICONOS[a.color + "_agua"], scale: 0.55, eyeOffset: new Cesium.Cartesian3(0, 0, -60000)}});
+      datosEnt.set(e.id, {tipo: "agua", d: a});
+    });
+  }
+  /* recorrido: los sismos aparecen en orden de fecha (fechaTope = ultimo dia visible; null = todos) */
+  function filtrarGlobal(){
+    dsGlobal.entities.values.forEach(e => {
+      const d = datosEnt.get(e.id);
+      e.show = !fechaTope || (d && d.tipo === "sismo" && d.d.fecha <= fechaTope);
+    });
+    redibujar();
+  }
+  function resumenTexto(){
+    const r = SISMOS.resumen;
+    if (EN) return `Since June 17 there were ${r.total} strong earthquakes on the planet. NISAR saw the ground move in the ${r.vistos} within its reach; ` +
+      `one is already verified against NASA. ${r.gris} were under the sea or very deep, and there the radar says "I can't measure it" instead of making something up. ` +
+      `${r.azul} are waiting for the next pass.`;
+    return `Desde el 17 de junio hubo ${r.total} sismos fuertes en el planeta. NISAR vio el movimiento del suelo en los ${r.vistos} que tenía a su alcance; ` +
+      `uno ya está verificado con NASA. ${r.gris} fueron bajo el mar o muy profundos, y ahí el radar dice "no puedo medirlo" en vez de inventar. ` +
+      `${r.azul} esperan la próxima pasada.`;
+  }
+
+  function tarjetaSismo(s){
+    const c = SEM[s.color];
+    return `<p id="nombreS" style="font-size:14px;color:var(--suave);margin:0">${T("Sismo del", "Earthquake of")} ${fechaES(s.fecha)} · USGS</p>` +
+      `<h3 style="font-family:var(--titulo);font-stretch:108%;font-size:24px;line-height:1.15;margin:4px 0 10px">${T("Magnitud", "Magnitude")} ${num(s.mag)}, ${lugarES(s.lugar)}</h3>` +
+      `<span class="sello" style="--c:${c.css}">${s.estado}</span>` +
+      `<p style="margin:0 0 10px">${s.explica}</p>` +
+      `<p style="font-size:14px;color:var(--suave);margin:0">${T("Profundidad", "Depth")} ${num(s.prof_km)} km.</p>` +
+      `<div class="solo-experto"><details open><summary>Dato técnico</summary><p>${s.estado_tabla}: ${s.detalle}. Código USGS ${s.id}.</p></details></div>` +
+      (s.escena ? `<button class="btn prim" type="button" style="margin-top:12px" onclick="abrirEscena('${s.escena}')">${T("Ver qué midió NISAR", "See what NISAR measured (in Spanish)")}</button>` : "");
+  }
+  function tarjetaAgua(a){
+    const c = SEM[a.color];
+    return `<p style="font-size:14px;color:var(--suave);margin:0">${a.cuando}</p>` +
+      `<h3 style="font-family:var(--titulo);font-stretch:108%;font-size:24px;line-height:1.15;margin:4px 0 10px">${a.titular || a.nombre}</h3>` +
+      `<span class="sello" style="--c:${c.css}">${a.estado}</span>` +
+      `<p style="margin:0 0 10px">${a.texto || ""}</p>` + (a.ojo ? `<p class="nota" style="--c:${c.css}">${a.ojo}</p>` : "");
+  }
+  function mostrarTarjeta(html, lon, lat){
+    limpiarEscena();
+    $("tarjeta").innerHTML = `<button class="btn" type="button" style="margin:0 0 12px;padding:6px 12px;font-size:14px" onclick="volverPlaneta()">${T("Volver al planeta", "Back to the planet")}</button>` + html;
+    $("tarjeta").hidden = false; $("ayudaExplorar").hidden = true;
+    girarGlobo(false);
+    volarA(lon, lat, 2.2e6);
+  }
+  async function abrirEscena(id){
+    $("tarjeta").hidden = true; $("ayudaExplorar").hidden = true;
+    girarGlobo(false);
+    await mostrarPunto(id);
+  }
+  function volverPlaneta(){
+    limpiarEscena();
+    $("tarjeta").hidden = true;
+    $("ayudaExplorar").hidden = modo !== "explorar";
+    volarA(-55, -5, 2.4e7);
+  }
+
+  /* ---------------- recorrido ---------------- */
+  const ILUSTRACION = `<div class="ecos">
+    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#3d4f1c"/><g fill="#C8E06A">${[10,26,42,58,74].map(x=>`<circle cx="${x}" cy="34" r="9"/>`).join("")}</g><rect y="48" width="90" height="12" fill="#5b4a2e"/></svg><b>Monte</b>eco fuerte: la señal rebota entre hojas y ramas</figure>
+    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#04090d"/><path d="M0 40 Q22 36 45 40 T90 40" stroke="#14323f" fill="none" stroke-width="2"/></svg><b>Agua quieta</b>espejo: el eco se va para otro lado y se ve negra</figure>
+    <figure><svg viewBox="0 0 90 60"><rect width="90" height="60" fill="#2b2430"/><g fill="#e9b7d6"><rect x="10" y="20" width="16" height="30"/><rect x="34" y="12" width="20" height="38"/><rect x="62" y="24" width="16" height="26"/></g></svg><b>Ciudad</b>rebote doble pared-suelo: muy brillante</figure>
+  </div>`;
+  const NO_PUEDE = [
+    ["Sismos bajo el mar", "El radar mide la superficie de la tierra firme. De 41 sismos fuertes (17 de junio al 6 de noviembre), 32 fueron en el mar o muy profundos: ahí NISAR no tiene dato y lo dice."],
+    ["Metros de movimiento junto a la falla", "Cuando el suelo se mueve metros en pocos días, la medición fina se rompe (Kumamoto, Japón). Para eso hace falta otra técnica."],
+    ["El nivel de un río", "NISAR ve dónde hay agua, no cuántos metros subió. Si el río crece sin salirse del cauce, el radar casi no lo nota."],
+    ["Incendios de pastizal", "El pasto quemado casi no cambia el eco del radar: en el Delta, 417 focos de fuego no dejaron una señal distinguible."],
+    ["Glaciares de la Patagonia", "El producto de NISAR para la velocidad del hielo vino vacío sobre el Perito Moreno. Hoy no sirve ahí."],
+    ["Decir qué cambió, solo con el radar", "El radar ve que algo cambió fuerte, pero un desmonte y una inundación pueden verse parecido. Hace falta saber qué había antes."],
+  ];
+  /* ================= RECORRIDO EN CAPITULOS =================
+     Cada paso: {cap, titulo, html, ...} y UNA de estas formas:
+       - globo:  vista:[lon,lat,alto], girar
+       - escena: escena:id, cfg:{capa, momento|fecha, chk:{...}, opac}, camara (opcional, pisa la de la escena)
+     guion(g): acciones automaticas (la pagina "maneja"). g.vuelo = fin del vuelo; g.esperar(ms); g.animar(ms, f(e));
+     todo se corta solo si el usuario cambia de paso. Con "reducir movimiento" todo va directo al estado final. */
+  const CANCELADO = Symbol("cancelado");
+  let guionTok = 0;
+  function cancelarGuion(){ guionTok++; }
+  function nuevoGuion(vuelo){
+    const tok = ++guionTok;
+    const vivo = () => { if (tok !== guionTok) throw CANCELADO; };
+    return {
+      vivo,
+      vuelo: Promise.resolve(vuelo).then(vivo),
+      esperar: ms => new Promise(r => setTimeout(r, MOVIMIENTO_REDUCIDO ? 0 : ms)).then(vivo),
+      animar: (ms, f) => new Promise(res => {
+        if (MOVIMIENTO_REDUCIDO || ms <= 0){ f(1); redibujar(); return res(); }
+        const t0 = performance.now();
+        const cuadro = t => {
+          if (tok !== guionTok) return res();
+          const k = Math.min(1, (t - t0) / ms), e = k * k * (3 - 2 * k);
+          f(e); redibujar();
+          if (k < 1) requestAnimationFrame(cuadro); else res();
+        };
+        requestAnimationFrame(cuadro);
+      }).then(vivo),
+    };
+  }
+  /* fundido de una capa de la escena (de 0 a "hasta"); al terminar queda como opacidad de la escena */
+  async function fundirCapa(g, id, ms, hasta = 0.85){
+    const ls = (capas[id] || []).filter(l => l.show && !l._oculta);
+    animando = true; ls.forEach(l => l.alpha = 0);
+    try { await g.animar(ms, e => ls.forEach(l => l.alpha = e * hasta)); }
+    finally { animando = false; }
+    if (id === capaActiva){ opacidad = hasta; $("opacidad").value = hasta * 100; }
+    actualizarVisibles(); actualizarLeyenda();
+  }
+  async function deslizarCorte(g, desde, hasta, ms){
+    await g.animar(ms, e => { viewer.scene.splitPosition = desde + (hasta - desde) * e; ubicarCorte(); });
+  }
+  function reiniciarEfectos(){
+    cancelarGuion();
+    if (comparando) alternarComparar(false);
+    pararSerie();
+    limiteFlechas = limiteCampo = Infinity; animando = false; iIzq = 0;
+    if (fechaTope){ fechaTope = null; filtrarGlobal(); }
+    if (capaPob) capaPob.alpha = 0.85;
+    if (capaDanio) capaDanio.alpha = 0.9;
+  }
+  const milES = n => Math.round(n).toLocaleString("es-AR");
+  const fechaISO = t => new Date(t).toISOString().slice(0, 10);
+
+  const PASOS = [
+    /* ---- 1. El radar ---- */
+    {cap: "El radar", titulo: "Un radar que ve a través de las nubes",
+     html: `<p>NISAR es un satélite de NASA y de la agencia espacial india (ISRO), lanzado en 2025. No saca fotos: manda pulsos de radio y escucha el eco que vuelve. Por eso ve de noche y con el cielo cubierto.</p>${ILUSTRACION}<p>Pasa sobre el mismo lugar cada 12 días. Comparando dos pasadas, sabe qué cambió.</p><div class="solo-experto"><p class="subt"><b>Polarizaciones.</b> NISAR emite la onda en horizontal (H) y escucha el eco en horizontal y en vertical (V). <b>HH</b> (sale y vuelve horizontal) responde a superficies duras y al doble rebote: paredes contra el suelo, troncos parados en el agua. <b>HV</b> (vuelve girada) aparece cuando la onda rebota muchas veces entre hojas y ramas: es el canal de la vegetación. El agua quieta hace de espejo y apaga los dos. Para el agua usamos la intensidad del eco en HH y HV (producto GCOV); para el movimiento del suelo, la fase de la onda en HH entre dos pasadas (producto GUNW).</p></div>`,
+     vista: [-62, -12, 2.2e7], girar: true},
+
+    /* ---- 2. El planeta: los sismos aparecen en orden de fecha ---- */
+    {cap: "El planeta", titulo: "Todos los sismos fuertes desde junio",
+     html: () => `<p class="reloj" id="reloj">&nbsp;</p><p>${resumenTexto()}</p><p>El color de cada punto dice qué tan seguros estamos de lo que midió el radar ahí. Ningún color es un adorno: es el resultado de una prueba.</p>`,
+     vista: [-40, 5, 2.6e7], girar: true,
+     guion: async g => {
+       const fs = SISMOS.sismos.map(s => s.fecha).sort();
+       const t0 = Date.parse(fs[0] + "T00:00:00Z"), t1 = Date.parse(fs[fs.length - 1] + "T00:00:00Z");
+       fechaTope = "0000"; filtrarGlobal();               // arranca vacío
+       await g.vuelo; await g.esperar(300);
+       await g.animar(6500, e => {
+         fechaTope = fechaISO(t0 + (t1 - t0) * e); filtrarGlobal();
+         const n = SISMOS.sismos.filter(s => s.fecha <= fechaTope).length;
+         if ($("reloj")) txt("reloj", `${fechaES(fechaTope)} · ${n} ${n === 1 ? "sismo" : "sismos"}`);
+       });
+       fechaTope = null; filtrarGlobal();
+     }},
+
+    /* ---- 3. Venezuela (4 pasos) ---- */
+    {cap: "Venezuela · el terremoto", titulo: "24 de junio: dos terremotos en 32 segundos",
+     html: `<p>Según el catálogo de USGS, el 24 de junio hubo dos terremotos con 32 segundos de diferencia: uno de magnitud 7,2 cerca de San Felipe y otro de 7,5 cerca de La Guaira, a unos 150 km. Los dos están sobre la misma falla, la línea punteada que va de oeste a este.</p><p class="nota" style="--c:var(--amarillo)">NISAR midió en detalle la zona de La Guaira, y eso es lo que vas a ver ahora. Cerca de San Felipe también ve el suelo cortado por la falla, con los dos lados moviéndose en sentido contrario, como indica USGS: ahí es un indicio, todavía no lo verificamos.</p>`,
+     escena: "la_guaira", cfg: {capa: "este_oeste", momento: "despues", chk: {chkFalla: true, chkFlechas: false}, opac: 0},
+     camara: {lon: -68.15, lat: 10.38, radio_m: 100000, distancia_m: 320000, pitch: -62},
+     guion: async g => {
+       await g.vuelo; await g.esperar(400);
+       await fundirCapa(g, "este_oeste", 1600);
+     }},
+    {cap: "Venezuela · el terremoto", titulo: "24 de junio: el suelo se corrió medio metro",
+     html: `<p>Cerca de La Guaira, NISAR comparó una pasada de antes con una de después y midió cuánto se movió cada punto del suelo.</p><p class="nota" style="--c:var(--verde)">Al sur del aeropuerto de Maiquetía el suelo se corrió unos <b>56 cm hacia el oeste</b>, casi el largo de un brazo. NASA/JPL reportó hasta unos 60 cm en la misma zona.</p><p class="subt">Azul: el suelo se movió al oeste. Rojo: al este. Las flechas muestran hacia dónde.</p>`,
+     escena: "la_guaira", cfg: {capa: "este_oeste", momento: "despues", chk: {chkFlechas: true, chkFalla: true}, opac: 0},
+     camara: {lon: -67.02, lat: 10.50, radio_m: 20000, distancia_m: 58000, pitch: -42},     // mas cerca, para que las flechas se vean
+     guion: async g => {
+       limiteFlechas = 0; actualizarVisibles();
+       await g.vuelo; await g.esperar(300);
+       await fundirCapa(g, "este_oeste", 1800);
+       await flechasListas; g.vivo();
+       await g.animar(2800, e => { limiteFlechas = Math.ceil(e * entFlechas.length); actualizarVisibles(); });
+     }},
+    {cap: "Venezuela · el terremoto", titulo: "En la imagen del radar, el sismo casi no se ve",
+     html: `<p>Así ve el radar La Guaira y Caracas: el eco que vuelve de cada lugar, en colores falsos. A la izquierda de la línea, antes del sismo; a la derecha, después.</p><p>A simple vista casi no cambia. El medio metro no se ve en la imagen: NISAR lo mide comparando su onda de radio, de unos 24 cm, entre dos pasadas.</p><p class="subt" id="subt"></p>`,
+     escena: "la_guaira", cfg: {capa: "ojos", momento: "antes", chk: {}, opac: 0},
+     guion: async g => {
+       await g.vuelo;
+       await fundirCapa(g, "ojos", 1500);
+       await g.esperar(900);
+       viewer.scene.splitPosition = 0.97; alternarComparar(true); viewer.scene.splitPosition = 0.97; ubicarCorte();
+       if ($("subt")) txt("subt", version === "chicos" ? "Arrastra la línea si quieres volver a comparar." : "Arrastrá la línea si querés volver a comparar.");
+       await deslizarCorte(g, 0.97, 0.03, 3200);
+       await g.esperar(500);
+       await deslizarCorte(g, 0.03, 0.5, 1400);
+     }},
+    {cap: "Venezuela · el terremoto", titulo: "¿Dónde se cayeron casas?",
+     html: () => { const D = puntos.la_guaira?.danio || {};
+       return `<p>Donde un edificio se derrumba, el suelo deja de parecerse a sí mismo entre una pasada y la otra. NISAR marca esas zonas de unos 250 m: <b style="color:#e8574a">rojo oscuro</b> si las ven dos órbitas, <b style="color:#fd8d3c">naranja</b> si las ve una sola.</p><p>Los puntos son lo que voluntarios constataron en el terreno: <b>negro</b>, derrumbe completo; <b style="color:#6fa8dc">azul</b>, daño importante o menor.</p><p class="nota" style="--c:var(--verde)">${D.validacion || ""}</p><p class="subt">Marca barrios donde es probable encontrar derrumbes, no edificios uno por uno.</p>`; },
+     escena: "la_guaira", cfg: {capa: "este_oeste", momento: "despues", chk: {chkDanio: true, chkCampo: true}, opac: 0},
+     camara: {lon: -66.93, lat: 10.575, radio_m: 14000, distancia_m: 42000, pitch: -50},
+     guion: async g => {
+       limiteCampo = 0; if (capaDanio) capaDanio.alpha = 0; actualizarVisibles();
+       await g.vuelo; await g.esperar(300);
+       await g.animar(1600, e => { if (capaDanio) capaDanio.alpha = 0.9 * e; });
+       await g.esperar(700);
+       await g.animar(3000, e => { limiteCampo = Math.ceil(e * entCampo.length); actualizarVisibles(); });
+     }},
+    {cap: "Venezuela · el terremoto", titulo: "¿Cuánta gente vivía donde más se movió?",
+     html: () => { const P = puntos.la_guaira?.poblacion || {};
+       return `<p class="cifra"><span id="contador">0</span></p><p>personas vivían (estimación 2020) donde el suelo se corrió más de ${Math.round(P.umbral_cm || 0)} cm.</p><p class="nota" style="--c:#bd0026">Es gente expuesta cerca de la ruptura, no un conteo de afectados: el daño lo produce el sacudón. Celdas de ~1 km: indica zonas, no manzanas.</p>`; },
+     escena: "la_guaira", cfg: {capa: "este_oeste", momento: "despues", chk: {chkPob: true}, opac: 0},
+     guion: async g => {
+       const P = punto.poblacion, meta = Math.round(P.personas_mayor_deformacion / 1000) * 1000;
+       if (capaPob) capaPob.alpha = 0;
+       await g.vuelo; await g.esperar(300);
+       await g.animar(2400, e => {
+         if (capaPob) capaPob.alpha = 0.85 * e;
+         if ($("contador")) txt("contador", "Unas " + milES(meta * e));
+       });
+     }},
+
+    /* ---- 4. Agua (2 pasos) ---- */
+    {cap: "Agua · crecidas", titulo: "Agosto, Delta del Paraná: el agua tapó las islas",
+     html: `<p>Con el cielo nublado, NISAR vio apagarse el eco de los bajos de las islas (en azul). Los mapas de agua de NASA, hechos con otros satélites, confirmaron que era agua.</p><div id="grafRec" class="graf"></div><p class="subt" id="subt"></p>`,
+     escena: "delta_parana", cfg: {capa: "cambio", fecha: "20260626"},
+     guion: async g => {
+       await g.vuelo; await g.esperar(400);
+       for (let i = 0; i < punto.fechas.length; i++){ ponerFecha(i); await g.esperar(1500); }
+       const pico = punto.fechas.indexOf("20260825");
+       if (pico >= 0) ponerFecha(pico);
+     }},
+    {cap: "Agua · crecidas", titulo: "Octubre, río Uruguay: una crecida en vivo",
+     html: () => `<p>El 11 de octubre el satélite óptico de NASA no veía el suelo: cielo cubierto. El radar sí. A la izquierda de la línea, el 26 de junio; a la derecha, el 12 de octubre. Negro = agua.</p><p class="subt" id="subt"></p><p class="nota" style="--c:var(--amarillo)">${AGUA[1].ojo}</p>`,
+     escena: "libres", cfg: {capa: "ojos", fecha: "20260626", opac: 0},
+     guion: async g => {
+       await g.vuelo;
+       await fundirCapa(g, "ojos", 1200);
+       await g.esperar(800);
+       ponerFecha(punto.fechas.length - 1);
+       viewer.scene.splitPosition = 0.97; alternarComparar(true); viewer.scene.splitPosition = 0.97; ubicarCorte();
+       await deslizarCorte(g, 0.97, 0.03, 3600);
+       await g.esperar(900);
+       await deslizarCorte(g, 0.03, 0.97, 1400);
+       alternarComparar(false);
+       activarCapa("marcado");
+       await fundirCapa(g, "marcado", 1500);
+       if ($("subt")) txt("subt", "En celeste, donde NISAR marcó posible agua nueva el 12 de octubre. En esas zonas, el mapa de agua de NASA hecho con otro radar (Sentinel-1) pasó de 1 % a 53 % de agua.");
+     }},
+
+    /* ---- 4b. El Niño: crecida en Chaco (src/agua_crecida_chaco.py, VALIDADO) ---- */
+    {cap: "El Niño · crecida en Chaco", titulo: "Octubre, Isla del Cerrito: el río entró en las islas",
+     html: () => `<p>Durante El Niño llovió mucho en la cuenca y crecieron el Paraná y el Paraguay. En Chaco hubo más de mil personas evacuadas. Mirá las islas donde se juntan los dos ríos: a la izquierda de la línea, el 7 de octubre; a la derecha, el 19, con el río a unos 7 metros. Negro = agua.</p><p>¿Cómo lo sabe? El radar escucha el eco en dos “canales”. Uno de ellos (HV) responde sobre todo a la vegetación: las hojas y ramas devuelven la onda girada. Cuando el río tapa las islas, el agua hace de espejo y ese eco se apaga. Marcamos agua nueva donde ese canal bajó a la mitad o menos.</p><p class="subt" id="subt"></p>`,
+     escena: "chaco", cfg: {capa: "ojos", fecha: "20261007", opac: 0},
+     camara: {lon: -58.70, lat: -27.24, radio_m: 9000, distancia_m: 30000, pitch: -55},
+     guion: async g => {
+       await g.vuelo;
+       await fundirCapa(g, "ojos", 1200);
+       await g.esperar(800);
+       iIzq = Math.max(0, punto.fechas.indexOf("20261007"));   // el texto dice: izquierda 7-oct, derecha 19-oct
+       ponerFecha(punto.fechas.indexOf("20261019"));
+       viewer.scene.splitPosition = 0.97; alternarComparar(true); viewer.scene.splitPosition = 0.97; ubicarCorte();
+       await deslizarCorte(g, 0.97, 0.03, 3600);
+       await g.esperar(900);
+       await deslizarCorte(g, 0.03, 0.97, 1400);
+       alternarComparar(false);
+       activarCapa("marcado");
+       await fundirCapa(g, "marcado", 1500);
+       if ($("subt")) txt("subt", "En celeste, donde NISAR marcó agua nueva el 19 de octubre: los bajos entre las lomas de las islas se llenaron de agua.");
+     }},
+    {cap: "El Niño · crecida en Chaco", titulo: "Entre Barranqueras y Corrientes: dos pasadas, el mismo resultado",
+     html: () => `<p>Esta vez hicimos la prueba a ciegas: fijamos la regla antes de mirar los datos. Mirá las islas del Paraná entre Barranqueras y Puerto Vilelas (Chaco) y la ciudad de Corrientes: a la izquierda de la línea, el 21 de junio (la primera pasada); a la derecha, el 19 de octubre. Negro = agua.</p><p class="subt" id="subt"></p><p class="nota" style="--c:var(--verde)">Dos pasadas de NISAR desde dos órbitas distintas (16 y 19 de octubre) marcaron agua nueva en los mismos lugares, y las fotos satelitales de NASA lo confirman: en las zonas marcadas el agua pasó de 13 % a 87 %; en las zonas sin cambio, de 7 % a 8 %.</p>`,
+     escena: "chaco", cfg: {capa: "ojos", fecha: "20260621", opac: 0},
+     camara: {lon: -58.87, lat: -27.52, radio_m: 8000, distancia_m: 26000, pitch: -55},
+     guion: async g => {
+       await g.vuelo;
+       await fundirCapa(g, "ojos", 1200);
+       await g.esperar(800);
+       iIzq = 0;                                              // izquierda: primera pasada (21-jun)
+       ponerFecha(punto.fechas.indexOf("20261019"));          // derecha: 19-oct
+       viewer.scene.splitPosition = 0.97; alternarComparar(true); viewer.scene.splitPosition = 0.97; ubicarCorte();
+       await deslizarCorte(g, 0.97, 0.03, 3600);
+       await g.esperar(900);
+       await deslizarCorte(g, 0.03, 0.97, 1400);
+       alternarComparar(false);
+       activarCapa("marcado");
+       await fundirCapa(g, "marcado", 1500);
+       if ($("subt")) txt("subt", "En celeste, el agua nueva que NISAR marcó el 19 de octubre. NISAR ve islas y bañados inundados; una calle o una casa son demasiado chicas para él.");
+     }},
+
+    /* ---- 5. Limites ---- */
+    {cap: "Los límites", titulo: "Lo que NISAR no puede hacer solo",
+     html: `<p>Saber cuándo no confiar es tan importante como medir. Esto lo probamos y no funcionó:</p><ul class="limites-lista entra">${NO_PUEDE.map(([t, d], i) => `<li style="--i:${i}"><b>${t}</b><span>${d}</span></li>`).join("")}</ul>`,
+     vista: [-62, -12, 2.2e7], girar: true},
+
+    /* ---- 6. Tu turno ---- */
+    {cap: "Tu turno", titulo: "Ahora explorá vos",
+     html: `<p>Todo lo que viste está en el globo, con todas las herramientas: capas, comparar, línea de tiempo, transparencia. Tocá cualquier sismo o crecida para ver qué midió NISAR, y qué no.</p><button class="btn prim" type="button" onclick="ponerModo('explorar')">Explorar el planeta</button>`,
+     vista: [-55, -5, 2.4e7], girar: true},
+  ];
+  /* ================= VERSION PARA CHICOS =================
+     Textos de la versión para chicos (ajustados el 22-oct, pasos 4, 6 y 9). Narra NISAR, en "tú".
+     Reusa escenas y guiones de PASOS; solo cambian textos, pasos y el personaje. apunta: [lon,lat] del haz en pasos sin escena. */
+  const SEM_CHICOS = {verde: "Seguro: otros científicos lo comprobaron", amarillo: "Casi seguro: falta confirmarlo",
+    azul: "Todavía no pasé por ahí", gris: "No lo puedo ver"};
+  /* los pasos de chicos reusan guiones de PASOS por TITULO (no por numero, asi no se corren al agregar pasos) */
+  const pasoGeneral = t => { const p = PASOS.find(x => x.titulo.startsWith(t)); if (!p) throw new Error('paso no encontrado: ' + t); return p; };
+  /* cara de NISAR en cada paso de PASOS_CHICOS (mismo orden) */
+  const CARAS_CHICOS = ["contento", "contento", "pensando", "serio", "sorpresa", "contento", "pensando", "contento", "serio", "feliz"];
+  const PASOS_CHICOS = [
+    {cap: "NISAR te cuenta · 1", titulo: "¡Hola! Soy NISAR",
+     html: `<p>¡Hola! Soy NISAR, un satélite. Me construyeron juntos la NASA, de Estados Unidos, y la ISRO, de la India. Me lanzaron al espacio el 30 de julio de 2025.</p><p>Vuelo alrededor de la Tierra a 747 kilómetros de altura. Mi antena es como un paraguas gigante: mide 12 metros, más o menos el largo de un autobús.</p>`,
+     vista: [-62, -12, 2.2e7], girar: true},
+    {cap: "NISAR te cuenta · 2", titulo: "Veo con ecos, como un murciélago",
+     html: `<p>No tengo ojos como una cámara de fotos. Mando ondas de radio hacia la Tierra y escucho el eco que vuelve, como hacen los murciélagos. Por eso puedo ver de noche y aunque haya nubes.</p>${ILUSTRACION}<p>El bosque me devuelve mucho eco. El agua quieta es como un espejo: el eco se va para otro lado, y por eso la veo negra. ¡Y la ciudad me brilla muchísimo!</p>`,
+     vista: [-62, -12, 2.2e7], girar: true},
+    {cap: "NISAR te cuenta · 3", titulo: "La Tierra está hecha de piezas que se mueven",
+     html: `<p>El suelo que pisas parece quieto, pero está hecho de piezas gigantes, como un rompecabezas. Se llaman placas tectónicas y se mueven muy, muy despacio.</p><p>Venezuela está justo donde se tocan dos de esas piezas: la placa del Caribe y la placa de Sudamérica. La del Caribe avanza hacia el este unos 2 centímetros por año, más despacio de lo que te crecen las uñas.</p><p class="probar"><b>Prueba esto:</b> junta las palmas de tus manos y aprieta fuerte. Ahora intenta deslizar una mano hacia adelante sin dejar de apretar. Se traban… y de golpe se resbalan. Eso pasa entre dos placas: se traban durante muchos años y un día se destraban de golpe. Ese golpe es un terremoto.</p><p class="subt">El mapa es un dibujo simple: la flecha no está a escala.</p>`,
+     vista: [-66, 12, 6e6], apunta: [-66.9, 10.6],
+     guion: async g => {
+       await g.vuelo;                                   // la flecha se crea con el mapa ya quieto (si no, Cesium no la dibuja)
+       // flecha como primitiva directa: como entidad, Cesium no la dibujaba de forma confiable en esta vista
+       const col = viewer.scene.primitives.add(new Cesium.PolylineCollection());
+       col.add({positions: Array.from({length: 13}, (_, k) => Cesium.Cartesian3.fromDegrees(-73 + k, 14.2, 30000)), width: 30,
+         material: Cesium.Material.fromType(Cesium.Material.PolylineArrowType, {color: Cesium.Color.fromCssColorString("#C8E06A")})});
+       primitivasExtra.push(col);
+       viewer.entities.add({position: Cesium.Cartesian3.fromDegrees(-67, 15.6), label: {...etiqueta("Placa del Caribe → hacia el este"), heightReference: Cesium.HeightReference.NONE}});
+       viewer.entities.add({position: Cesium.Cartesian3.fromDegrees(-64, 6.5), label: {...etiqueta("Placa de Sudamérica"), heightReference: Cesium.HeightReference.NONE}});
+       redibujarLuego();
+     }},
+    {cap: "NISAR te cuenta · 4", titulo: "Lo que pasó el 24 de junio",
+     html: `<p>El 24 de junio de 2026, las placas se destrabaron debajo de la costa, cerca de La Guaira. Hubo dos sismos fuertes, uno detrás del otro, en menos de un minuto.</p><p class="nota" style="--c:var(--verde)">Si lo viviste, es normal haberte asustado. Asustarse es la forma que tiene el cuerpo de cuidarte.</p><p class="subt">La línea punteada es la falla, donde se destrabaron las placas. El punto rojo es el epicentro.</p>`,
+     escena: "la_guaira", cfg: {capa: "este_oeste", momento: "despues", chk: {chkFalla: true}, opac: 0}},
+    {cap: "NISAR te cuenta · 5", titulo: "Lo que medí: el suelo se corrió",
+     html: `<p>Pasé por arriba antes y después del terremoto, y comparé las dos veces. Así descubrí algo sorprendente: cerca del aeropuerto, el suelo se corrió unos <b>56 centímetros hacia el oeste</b>. ¡Más o menos el largo de tu brazo!</p><p>Cada flecha muestra hacia dónde se movió el suelo. Los científicos de la NASA midieron casi lo mismo que yo.</p><p class="subt">Azul: el suelo se movió hacia el oeste. Blanco: casi no se movió.</p>`,
+     escena: "la_guaira", cfg: {capa: "este_oeste", momento: "despues", chk: {chkFlechas: true, chkFalla: true}, opac: 0},
+     guion: g => pasoGeneral("24 de junio: el suelo se corrió").guion(g)},
+    {cap: "NISAR te cuenta · 6", titulo: "Un truco: en la foto no se ve",
+     html: `<p>Mira mis dos imágenes: a la izquierda de la línea, antes del terremoto; a la derecha, después. ¿Ves alguna diferencia? ¡Casi no se nota!</p><p>El movimiento no lo vi «mirando»: lo medí. Mi onda de radio mide 24 centímetros y la uso como una regla invisible. Si el suelo se mueve aunque sea un poquito, mi eco vuelve un poco corrido, y así me doy cuenta.</p><p class="probar"><b>En pocas palabras: ¡tengo un superpoder!</b> Envío señales invisibles hacia la Tierra, como si lanzara una pelota y esperara que rebotara. Pero estas señales son especiales: me ayudan a medir el suelo con muchísima precisión. Si algo se mueve, aunque sea un poquito, ¡puedo descubrirlo!</p><p class="subt" id="subt"></p>`,
+     escena: "la_guaira", cfg: {capa: "ojos", momento: "antes", chk: {}, opac: 0},
+     guion: g => pasoGeneral("En la imagen del radar").guion(g)},
+    {cap: "NISAR te cuenta · 7", titulo: "Cuando no sé algo, lo digo",
+     html: () => `<p class="reloj" id="reloj">&nbsp;</p><p>Desde junio hubo ${SISMOS.resumen.total} terremotos fuertes en el planeta. A cada uno le pongo un color para decir qué tan seguro estoy:</p><div class="sem" style="margin:0 0 12px">${Object.entries(SEM_CHICOS).map(([k, t]) => `<i style="--c:${SEM[k].css}"></i><span>${t}</span>`).join("")}</div><p>${SISMOS.resumen.gris} de esos terremotos fueron debajo del mar o muy profundo, y ahí mi onda no llega. En vez de inventar, digo: «no lo puedo medir». Eso también es hacer ciencia.</p>`,
+     vista: [-40, 5, 2.6e7], girar: true, guion: g => pasoGeneral("Todos los sismos fuertes").guion(g)},
+    {cap: "NISAR te cuenta · 8", titulo: "También veo el agua",
+     html: `<p>No solo veo terremotos. En agosto de 2026, en el Delta del río Paraná, en Argentina, el agua cubrió partes de las islas. El cielo estaba nublado, pero yo vi cómo esas zonas se volvían oscuras como espejos. Los mapas de agua de la NASA, hechos con otros satélites, confirmaron que era agua.</p><p class="subt">En azul, donde mi eco se apagó: ahí llegó el agua.</p><p class="subt" id="subt"></p>`,
+     escena: "delta_parana", cfg: {capa: "cambio", fecha: "20260626"},
+     guion: g => pasoGeneral("Agosto, Delta del Paraná").guion(g)},
+    {cap: "NISAR te cuenta · 9", titulo: "Nadie sabe cuándo: por eso nos preparamos",
+     html: `<p>Una cosa importante: ni yo ni nadie puede <b>saber el día, la hora o el lugar exacto donde ocurrirá un terremoto.</b></p><p>Lo que sí podemos hacer es estudiar cómo se mueve la Tierra, aprender sobre los terremotos y prepararnos mejor.</p><p class="probar"><b>¡Conocer nuestro planeta también es una forma de cuidarnos!</b></p>`,
+     vista: [-62, -12, 2.2e7], girar: true},
+    {cap: "NISAR te cuenta · 10", titulo: "¿Te gustaría estudiar la Tierra?",
+     html: `<p>Las personas que me construyeron y las que estudian mis datos también fueron chicos curiosos como tú. Hacen trabajos como estos:</p><ul class="oficios"><li>Geóloga y geólogo</li><li>Sismóloga y sismólogo</li><li>Ingeniería espacial</li><li>Programación</li><li>Ciencia de datos</li><li>Hidrología</li></ul><p>Si te gustó descubrir cómo se mueve la Tierra, ¡quizás un día trabajes con satélites como yo!</p><button class="btn prim" type="button" onclick="ponerModo('explorar')">Explorar el planeta</button>`,
+     vista: [-55, -5, 2.4e7], girar: true},
+  ];
+
+  /* ---- version elegida ---- */
+  let version = null;
+  /* ---- modo cine. Reusa escenas y guiones de PASOS; cambia el texto (un dato, un titular, una linea) y avanza solo.
+     Todas las cifras salen de punto.json / sismos.json (estados VERIFICADO / VALIDADO). ---- */
+  const cine = (i, o) => ({...PASOS[i], ...o});
+  const fuentesTxt = () => {
+    const ult = SISMOS ? fechaES(SISMOS.sismos.map(x => x.fecha).sort().pop()) : "";
+    return T(`Datos: NISAR (NASA/ISRO, productos provisionales, vía ASF DAAC) · NASA OPERA DSWx · USGS · WorldPop · HOT (CC BY-NC-SA 4.0). Sismos al ${ult} de 2026.`,
+             `Data: NISAR (NASA/ISRO, provisional products, via ASF DAAC) · NASA OPERA DSWx · USGS · WorldPop · HOT (CC BY-NC-SA 4.0). Earthquakes through ${ult}, 2026.`);
+  };
+  const PASOS_CINE = [
+    cine(3, {cap: T("Venezuela · 24 de junio de 2026", "Venezuela · June 24, 2026"), cifra: "56 cm",
+      titulo: T("El suelo se corrió hacia el oeste", "The ground shifted west"),
+      linea: T("NISAR lo midió comparando una pasada de antes del terremoto con una de después. NASA/JPL reportó hasta unos 60 cm en la misma zona. Azul: se movió al oeste.",
+               "NISAR measured it by comparing a pass before the earthquake with one after. NASA/JPL reported up to about 60 cm in the same area. Blue: moved west.")}),
+    cine(4, {cap: T("Venezuela · así lo ve el radar", "Venezuela · how the radar sees it"),
+      titulo: T("En la imagen, el sismo casi no se ve", "In the image, the earthquake is almost invisible"),
+      linea: T("Antes y después parecen iguales. El medio metro sale de comparar la onda del radar entre dos pasadas.",
+               "Before and after look the same. The half meter comes from comparing the radar wave between two passes.")}),
+    cine(5, {cap: T("Venezuela · derrumbes", "Venezuela · collapsed buildings"), cifra: T("248 de 328", "248 of 328"),
+      titulo: T("derrumbes relevados en el terreno están en las zonas que marcó el radar", "collapses surveyed on the ground fall inside the areas the radar flagged"),
+      linea: T("Señala barrios donde mirar primero, no edificios uno por uno.", "It points to neighborhoods to check first, not to individual buildings.")}),
+    /* la serie completa: el desafio pide seguir el cambio en el tiempo */
+    cine(9, {cap: T("Chaco · río Paraná, de junio a octubre de 2026", "Chaco · Paraná River, June to October 2026"),
+      cifra: `<span id="cineFecha" style="font-size:.62em">&nbsp;</span>`,
+      titulo: T("Nueve pasadas de NISAR sobre el mismo lugar", "Nine NISAR passes over the same place"),
+      linea: T("Con sol o con nubes. Negro es agua: el río va entrando en las islas.", "Clear or cloudy. Black is water: the river moves into the islands."),
+      cfg: {capa: "ojos", fecha: "20260621", opac: 0}, pausa: 1200,
+      guion: async g => {
+        await g.vuelo;
+        await fundirCapa(g, "ojos", 1200);
+        for (let i = 0; i < punto.fechas.length; i++){
+          ponerFecha(i);
+          if ($("cineFecha")) txt("cineFecha", F(punto.fechas_texto[i]).replace(/,? (de )?2026/, ""));
+          await g.esperar(i ? 850 : 1300);
+        }
+      }}),
+    cine(9, {cap: T("Chaco · crecida del Paraná, octubre de 2026", "Chaco · Paraná flood, October 2026"), cifra: "13 → 87 %",
+      titulo: T("de agua en las zonas que NISAR marcó como agua nueva", "water in the areas NISAR flagged as new water"),
+      linea: T("El río tapó las islas frente a Resistencia. Los mapas de agua de NASA, hechos con otros satélites, lo confirman.",
+               "The river covered the islands off Resistencia. NASA water maps, made with other satellites, confirm it.")}),
+    cine(1, {cap: T("El planeta · desde junio de 2026", "The planet · since June 2026"),
+      cifra: () => `${SISMOS.resumen.gris} ${T("de", "of")} ${SISMOS.resumen.total}`,
+      titulo: T("sismos fuertes que el radar no puede medir, y lo dice", "strong earthquakes the radar cannot measure, and it says so"),
+      linea: T("Fueron bajo el mar o muy profundos. Cada color es el resultado de una prueba: verde, confirmado; gris, sin dato.",
+               "They were under the sea or very deep. Each color is the result of a test: green, confirmed; gray, no data.")}),
+    {cap: "LandSense", titulo: T("Un radar que dice qué cambió en la Tierra, y qué tan seguro está.", "A radar that tells what changed on Earth, and how sure it is."),
+     vista: [-62, -12, 2.2e7], girar: true, fin: true},
+  ];
+  const NOMBRE_VERSION = {chicos: "Para chicos", general: "General", detalle: "En detalle"};
+  const listaPasos = () => version === "chicos" ? PASOS_CHICOS : version === "cine" ? PASOS_CINE : PASOS;
+  function abrirSelector(){ $("selector").hidden = false; setTimeout(() => $("opciones").querySelector("button").focus(), 50); }
+  function elegirVersion(v){
+    version = v;
+    $("selector").hidden = true;
+    document.body.classList.toggle("v-chicos", v === "chicos");
+    document.body.classList.toggle("cine", v === "cine");
+    const exp = v === "detalle";
+    $("chkExperto").checked = exp; document.body.classList.toggle("experto", exp);
+    paso = 0;
+    ponerModo("recorrido");
+  }
+
+  /* ---- personaje NISAR y su haz ---- */
+  let apuntaA = null;
+  function mostrarNisar(si){
+    const n = $("nisar");
+    if (si && n.hidden){
+      n.hidden = false; n.classList.add("fuera");
+      requestAnimationFrame(() => requestAnimationFrame(() => n.classList.remove("fuera")));
+      setTimeout(() => { dibujarHaz(); redibujar(); }, MOVIMIENTO_REDUCIDO ? 0 : 1300);
+    } else if (!si){ n.hidden = true; n.classList.add("fuera"); }
+    dibujarHaz();
+  }
+  function apuntar(lonlat){
+    apuntaA = lonlat ? Cesium.Cartesian3.fromDegrees(lonlat[0], lonlat[1], 0) : null;
+    dibujarHaz(); redibujar();
+  }
+  function dibujarHaz(){
+    const h = $("haz"), n = $("nisar");
+    const ocultar = v => h.toggleAttribute("hidden", v);   // en un <svg>, .hidden no quita el atributo: usar toggleAttribute
+    if (!apuntaA || n.hidden || n.classList.contains("fuera") || modo !== "recorrido"){ ocultar(true); return; }
+    const ocl = new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84, viewer.camera.positionWC);
+    const p = ocl.isPointVisible(apuntaA) ? Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, apuntaA) : null;
+    if (!p){ ocultar(true); return; }
+    const r = n.getBoundingClientRect();
+    const ox = r.left + r.width * 178 / 220, oy = r.top + r.height * 50 / 170;      // centro de la antena
+    const dx = p.x - ox, dy = p.y - oy, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    const w0 = 5, w1 = Math.max(14, Math.min(42, L * 0.1));
+    $("hazCono").setAttribute("points", `${ox + nx * w0},${oy + ny * w0} ${ox - nx * w0},${oy - ny * w0} ${p.x - nx * w1},${p.y - ny * w1} ${p.x + nx * w1},${p.y + ny * w1}`);
+    const gr = $("gradHaz"); gr.setAttribute("x1", ox); gr.setAttribute("y1", oy); gr.setAttribute("x2", p.x); gr.setAttribute("y2", p.y);
+    $("hazBlanco").setAttribute("cx", p.x); $("hazBlanco").setAttribute("cy", p.y);
+    ocultar(false);
+  }
+  viewer.scene.postRender.addEventListener(dibujarHaz);
+  addEventListener("resize", () => { dibujarHaz(); redibujar(); });
+
+  /* si una escena no existe (p. ej. falta export), el paso usa una tarjeta simple */
+  const ALT = {libres: {html: () => tarjetaAgua(AGUA[1]), vista: [-57.09, -29.71, 6e5]}};
+
+  /* "En detalle": cada paso con escena suma su dato tecnico y sus fuentes */
+  function tecnico(P){
+    const p = P.escena && puntos[P.escena];
+    if (!p || version !== "detalle") return "";
+    return `<details class="tec" open><summary>Dato técnico</summary><p>${p.resultado || ""}</p><p>${p.satelite}. ${p.pares}.</p></details>`;
+  }
+  function selloEscena(id){
+    const p = puntos[id]; if (!p) return "";
+    const color = p.color || ESTADO_COLOR[p.estado] || "amarillo";
+    const nombre = {VERIFICADO: T("Verificado", "Verified"), VALIDADO: T("Validado", "Validated")}[p.estado] || p.estado;
+    return `<span class="sello" style="--c:${SEM[color].css}">${nombre}</span>`;
+  }
+  function dibujarProgreso(){
+    let h = "", ant = null;
+    listaPasos().forEach((P, k) => {
+      const c = P.cap.split(" · ")[0];
+      if (ant !== null && c !== ant) h += `<i class="sep"></i>`;
+      h += `<i class="${k <= paso ? "hecho" : ""}"></i>`; ant = c;
+    });
+    $("puntitos").innerHTML = h;
+    txt("pasoN", `${paso + 1} de ${listaPasos().length}`);
+    txt("btnVersion", version ? `${NOMBRE_VERSION[version]} · cambiar` : "");
+  }
+
+  async function irPaso(i){
+    reiniciarEfectos();
+    const LP = listaPasos();
+    paso = Math.max(0, Math.min(LP.length - 1, i));
+    let P = LP[paso];
+    if (version === "chicos"){
+      const n = $("nisar"); n.dataset.cara = CARAS_CHICOS[paso] || "contento";
+      n.classList.remove("salta"); void n.offsetWidth; n.classList.add("salta");
+    }
+    if (P.escena && !puntos[P.escena]) P = {...P, ...(ALT[P.escena] || {vista: [-55, -5, 2.4e7]}), escena: null, guion: null};
+    dibujarProgreso();
+    $("btnAnt").disabled = paso === 0;
+    $("btnSig").textContent = paso === LP.length - 1 ? "Explorar" : "Siguiente";
+    $("btnRep").hidden = !P.guion;
+    if (version === "cine"){
+      const cf = typeof P.cifra === "function" ? P.cifra() : P.cifra;
+      $("cap").innerHTML = `<p class="capitulo">${P.cap}${P.escena ? selloEscena(P.escena) : ""}</p>` + (cf ? `<p class="cifra">${cf}</p>` : "") +
+        `<h2>${P.titulo}</h2>` + (P.linea ? `<p class="linea">${P.linea}</p>` : "") +
+        (P.fin ? `<div class="acciones"><button class="btn prim" type="button" onclick="abrirSelector()">${T("Recorrido completo", "Full tour (in Spanish)")}</button><button class="btn" type="button" onclick="ponerModo('explorar')">${T("Explorar el planeta", "Explore the planet")}</button></div><p class="fuentes">${fuentesTxt()}</p>` : "");
+    } else
+    $("cap").innerHTML = `<p class="capitulo">${P.cap}</p><h2>${P.titulo}</h2>` + (P.escena ? selloEscena(P.escena) : "") +
+      (typeof P.html === "function" ? P.html() : P.html) + tecnico(P) + `<div id="leyRec"></div>`;
+    $("tarjeta").hidden = true;
+    $("panel").scrollTop = 0;
+    const yo = paso;
+    if (P.escena){
+      girarGlobo(false);
+      const nueva = puntoId !== P.escena;
+      if (nueva) await mostrarPunto(P.escena, {sinVuelo: true});
+      if (paso !== yo || puntoId !== P.escena || modo !== "recorrido") return;   // el usuario ya avanzó
+      const c = P.cfg || {};
+      ["chkFlechas", "chkFalla", "chkPob", "chkDanio", "chkCampo"].forEach(k => $(k).checked = !!(c.chk || {})[k]);
+      opacidad = c.opac ?? 0.85; $("opacidad").value = opacidad * 100;
+      if (c.capa) activarCapa(c.capa);
+      if (esSerie()) ponerFecha(Math.max(0, punto.fechas.indexOf(c.fecha)));
+      else ponerMomento(c.momento || "despues");
+      dibujarGrafico(punto.grafico);
+      if (esSerie()) moverCursor();
+      actualizarVisibles(); actualizarLeyenda();
+      const vuelo = mirar("3d", nueva, P.camara);
+      apuntar(version === "chicos" ? [punto.camara.lon, punto.camara.lat] : null);
+      if (P.guion) correrGuion(P, vuelo);
+    } else {
+      limpiarEscena();
+      if (P.extra) P.extra();
+      apuntar(version === "chicos" ? P.apunta : null);
+      const vuelo = volarA(...P.vista);
+      girarGlobo(!!P.girar);
+      if (P.guion) correrGuion(P, vuelo);
+    }
+  }
+  async function correrGuion(P, vuelo){
+    const g = nuevoGuion(vuelo);
+    try {
+      await P.guion(g);
+      if (version === "cine" && modo === "recorrido"){            // cine: avanza solo cuando termina el efecto
+        await g.esperar(P.pausa ?? 3500);
+        if (paso < listaPasos().length - 1) irPaso(paso + 1);
+      }
+    }
+    catch(e){ if (e !== CANCELADO) console.error("guion:", e); }
+  }
+
+  /* ---------------- modos ---------------- */
+  function ponerModo(m){
+    reiniciarEfectos();
+    if (m !== "recorrido" && version === "cine"){ version = null; document.body.classList.remove("cine"); }
+    modo = m;
+    $("velo").hidden = m !== "portada";                                    // portada: el globo es fondo, no se toca
+    viewer.scene.screenSpaceCameraController.enableInputs = m !== "portada";
+    $("tip").hidden = true;
+    mostrarNisar(m === "recorrido" && version === "chicos");
+    if (m !== "recorrido") apuntar(null);
+    document.body.classList.toggle("modo-recorrido", m === "recorrido");
+    document.querySelectorAll("#modos button").forEach(b => b.setAttribute("aria-pressed", b.dataset.modo === m));
+    $("portada").hidden = m !== "portada";
+    $("leyenda").hidden = m === "portada";
+    $("panel").hidden = m === "portada";
+    const rec = m === "recorrido";
+    $("pasos").hidden = !rec; $("cap").hidden = !rec; $("navCap").hidden = !rec;
+    $("ayudaExplorar").hidden = m !== "explorar";
+    $("tarjeta").hidden = true;
+    if (rec) irPaso(paso);
+    else {
+      limpiarEscena();
+      volarA(m === "portada" ? -80 : -55, -5, 2.4e7, 2.6, m === "portada" ? 0.16 : 0.09);
+      girarGlobo(m === "portada");
+    }
+  }
+
+  /* ---------------- interaccion con el globo ---------------- */
+  const manejador = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  const elegido = pos => { const p = viewer.scene.pick(pos); return (p && p.id && datosEnt.get(p.id.id)) || null; };
+  manejador.setInputAction(click => {
+    if (modo === "portada") return;
+    const d = elegido(click.position);
+    if (!d){ $("tip").hidden = true; return; }
+    if (d.tipo === "tip"){ mostrarTip(d.texto, click.position); return; }
+    if (modo !== "explorar") ponerModo("explorar");
+    if (d.tipo === "sismo") mostrarTarjeta(tarjetaSismo(d.d), d.d.lon, d.d.lat);
+    if (d.tipo === "agua"){
+      if (d.d.escena && puntos[d.d.escena]) abrirEscena(d.d.escena);
+      else mostrarTarjeta(tarjetaAgua(d.d), d.d.lon, d.d.lat);
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  manejador.setInputAction(mov => {
+    if (modo === "portada") return;
+    const d = elegido(mov.endPosition);
+    viewer.scene.canvas.style.cursor = d ? "pointer" : "";
+    if (d && d.tipo === "sismo") mostrarTip(`M${num(d.d.mag)} · ${lugarES(d.d.lugar)}<br><span style="color:${SEM[d.d.color].css}">${d.d.estado}</span>`, mov.endPosition);
+    else if (d && d.tipo === "agua") mostrarTip(`${d.d.nombre}<br><span style="color:${SEM[d.d.color].css}">${d.d.estado}</span>`, mov.endPosition);
+    else if (!d || d.tipo !== "tip") $("tip").hidden = true;
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+  ["LEFT_DOWN", "WHEEL", "PINCH_START"].forEach(t => manejador.setInputAction(() => girarGlobo(false), Cesium.ScreenSpaceEventType[t]));
+  function mostrarTip(html, pos){
+    const t = $("tip"); t.innerHTML = html; t.hidden = false;
+    t.style.left = Math.min(pos.x + 14, innerWidth - 270) + "px"; t.style.top = (pos.y + 14) + "px";
+  }
+
+  /* ---------------- arranque ---------------- */
+  async function iniciar(){
+    try { SISMOS = await (await fetch("sismos.json")).json(); }
+    catch(e){ avisar("No se pudo leer sismos.json. Abrí el visor con Live Server desde VS Code (con doble clic el navegador bloquea la lectura de archivos) y corré src/sismos_export_visor.py."); return; }
+    try {
+      const lista = await (await fetch("puntos/index.json")).json();
+      for (const id of lista.puntos){
+        try { puntos[id] = await (await fetch(`puntos/${id}/punto.json`)).json(); }
+        catch(e){ console.warn("escena sin datos:", id, e); }
+      }
+    } catch(e){ console.warn("sin puntos/index.json", e); }
+    if (EN){                                          // textos en ingles (ver nota junto a EN)
+      const EXPLICA_EN = [
+        ["El sismo fue bajo el mar", "The earthquake was under the sea or very deep: the radar measures the land surface, not the sea floor."],
+        ["El sismo es reciente", "The earthquake is recent: the satellite has not yet passed with the geometry needed, or the data has not been published."],
+        ["Dos órbitas de NISAR ven el suelo moverse", "Two NISAR orbits see the ground move tens of centimeters around the epicenter, and they agree. A pass from the other side of the satellite is still missing to tell how much was sinking and how much was sideways motion."],
+        ["Ocurrió la misma tarde", "It happened the same afternoon and close to the magnitude 7.7 earthquake: the radar sees the sum of both movements and cannot separate them."],
+        ["Dos órbitas de NISAR ven el suelo romperse", "Two NISAR orbits see the ground break along the fault, with the north side shifted west: the same as the USGS seismic analysis indicates. We do not give the centimeters to the west or upward: the other satellite geometry came out with processing errors."],
+        ["Cerca de la falla el suelo se movió metros", "Near the fault the ground moved by meters, and with the available passes the fine measurement breaks down. The system sees the earthquake but refuses to mark it as verified."],
+        ["NISAR midió que el suelo se corrió", "NISAR measured that the ground shifted about 56 cm to the west, south of Maiquetía airport. NASA/JPL measured the same (up to about 60 cm)."],
+        ["Fue parte del mismo doble sismo", "It was part of the same double earthquake as La Guaira. NISAR sees a fault cutting the ground from east to west, with the two sides moving in opposite directions, the same as the USGS seismic analysis indicates. It is an indication: we defined that comparison after seeing the map."]];
+      const ESTADO_EN = {"NISAR no puede medirlo": "NISAR cannot measure it", "Visto, falta confirmar": "Seen, not yet confirmed",
+        "Esperando la próxima pasada": "Waiting for the next pass", "Visto: coincide con USGS": "Seen: agrees with USGS", "Visto y verificado": "Seen and verified"};
+      SISMOS.sismos.forEach(x => {
+        x.estado = ESTADO_EN[x.estado] || x.estado;
+        const e = EXPLICA_EN.find(([k]) => x.explica.startsWith(k)); if (e) x.explica = e[1];
+      });
+      const AGUA_EN = {
+        agua_delta: {nombre: "Paraná Delta, Argentina", estado: "Validated", cuando: "August 2026"},
+        agua_libres: {nombre: "Uruguay River at Paso de los Libres, Argentina", estado: "Strong indication", cuando: "October 2026",
+          titular: "The Uruguay River left its banks and NISAR saw it under full cloud cover",
+          texto: "On October 11 NASA's optical satellite could not see the ground: 0% clear sky. The radar could. In the areas where NISAR flagged new water next to the river, the NASA water map made with another radar (Sentinel-1) went from 1% to 53% water; in the unchanged areas it barely moved.",
+          ojo: "It is still an indication: our control test (a date with no flood) also flagged some plowed fields, just above what we had set as tolerable. We then ran the blind test on the Paraná flood in Chaco, and there it passed."},
+        agua_apipe: {nombre: "Yacyretá and Apipé island, Paraná River", estado: "Image only, not analyzed", cuando: "October 2026",
+          titular: "The Paraná rises downstream of Yacyretá",
+          texto: "Here we only show the radar image, with no analysis. The blind test of the method was done downstream, in Greater Resistencia (Chaco), and it passed."},
+        agua_chaco: {nombre: "Paraná and Paraguay rivers at Greater Resistencia, Chaco", estado: "Validated", cuando: "October 2026, during El Niño",
+          titular: "During El Niño, the Paraná and the Paraguay flowed into the islands, and NISAR saw it under cloudy skies",
+          texto: "Two NISAR passes (October 16 and 19) flagged new water on the islands at Isla del Cerrito and off Barranqueras. NASA satellite images confirm it: in the flagged areas water went from 13% in August to 87% on October 19.",
+          ojo: "It was a blind test: the rule was set before looking at the data. NISAR sees flooded islands and wetlands, not streets or houses."}};
+      AGUA.forEach(a => Object.assign(a, AGUA_EN[a.id] || {}));
+      const P = $("portada");
+      P.querySelector(".ante").textContent = "La Guaira, Venezuela · June 24, 2026";
+      P.querySelector("h1").textContent = "The ground shifted half a meter. A radar measured it from space.";
+      P.querySelector(".bajada").textContent = "NISAR, the NASA and ISRO satellite, sees the ground at night and through clouds. We asked it what changed on Earth since June 2026, and asked it to say when it is sure and when it is not.";
+      P.querySelector(".dato").setAttribute("aria-label", "About 56 centimeters");
+      $("btnCine").innerHTML = "&#9654; Watch it in 90 seconds";
+      txt("btnEmpezar", "Full tour (in Spanish)"); txt("btnExplorar", "Explore the planet");
+      $("marca").querySelector("small").textContent = "Earth as seen by the NISAR radar";
+      document.querySelector('#modos [data-modo="recorrido"]').textContent = "Tour";
+      document.querySelector('#modos [data-modo="explorar"]').textContent = "Explore";
+      $("experto").querySelector("span").textContent = "For experts";
+      txt("salirCine", "Exit"); txt("cargando", "Loading the planet…");
+      $("selector").querySelector(".sub").textContent = "The full tours are in Spanish for now. The 90-second version and Explore are in English.";
+      txt("selTit", "Three ways to tour it"); txt("selCerrar", "Back");
+      const A = $("ayudaExplorar");
+      A.querySelector("h2").textContent = "Explore the planet";
+      A.querySelector("p").textContent = "Each dot is a strong earthquake or a flood since June 2026. Tap one to see what NISAR measured there, or what it could not measure and why.";
+      $("btnIdioma").innerHTML = `<span class="largo">Versión en español</span><span class="corto">Español</span>`;
+    }
+    $("btnIdioma").onclick = () => { location.search = EN ? "" : "?lang=en"; };
+    txt("fuentes", fuentesTxt()); txt("fuentesExp", fuentesTxt());
+    txt("resumen", resumenTexto());
+    dibujarGlobal(); leyendaGlobal();
+    document.querySelectorAll("#modos button").forEach(b => b.onclick = () =>
+      b.dataset.modo === "recorrido" && !version ? abrirSelector() : ponerModo(b.dataset.modo));
+    document.querySelectorAll("#opciones button").forEach(b => b.onclick = () => elegirVersion(b.dataset.v));
+    $("selCerrar").onclick = () => $("selector").hidden = true;
+    $("btnVersion").onclick = abrirSelector;
+    $("marca").onclick = () => ponerModo("portada");
+    $("btnEmpezar").onclick = abrirSelector;
+    $("btnCine").onclick = () => elegirVersion("cine");
+    $("salirCine").onclick = () => ponerModo("portada");
+    $("btnExplorar").onclick = () => ponerModo("explorar");
+    $("btnAnt").onclick = () => irPaso(paso - 1);
+    $("btnRep").onclick = () => irPaso(paso);
+    $("btnCalidad").onclick = alternarCalidad;
+    $("btnSig").onclick = () => paso === listaPasos().length - 1 ? ponerModo("explorar") : irPaso(paso + 1);
+    $("volver").onclick = volverPlaneta;
+    $("chkExperto").onchange = e => document.body.classList.toggle("experto", e.target.checked);
+    document.querySelectorAll("#momento button").forEach(b => b.onclick = () => ponerMomento(b.dataset.m));
+    ["chkFlechas", "chkFalla", "chkPob", "chkDanio", "chkCampo"].forEach(i => $(i).onchange = () => { actualizarVisibles(); actualizarLeyenda(); });
+    $("serieFecha").oninput = e => { pararSerie(); ponerFecha(+e.target.value); };
+    $("btnPlay").onclick = alternarSerie;
+    $("opacidad").oninput = e => { opacidad = e.target.value / 100; actualizarVisibles(); };
+    document.querySelectorAll("[data-vista]").forEach(b => b.onclick = () => mirar(b.dataset.vista));
+    $("btnOrbita").onclick = alternarOrbita;
+    $("btnComparar").onclick = $("btnComparar2").onclick = () => alternarComparar();
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && !$("selector").hidden){ $("selector").hidden = true; return; }
+      if (e.key === "Escape" && version === "cine"){ ponerModo("portada"); return; }
+      if (modo !== "recorrido" || e.target.tagName === "INPUT" || !$("selector").hidden) return;
+      if (e.key === "ArrowRight") $("btnSig").click();
+      if (e.key === "ArrowLeft" && paso > 0) irPaso(paso - 1);
+    });
+    viewer.camera.setView({destination: Cesium.Cartesian3.fromDegrees(-80, -5, 2.4e7)});
+    encuadrar(0.16);
+    ponerModo("portada");
+  }
+  iniciar();
+</script>
+</body>
+</html>

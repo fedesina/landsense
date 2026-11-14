@@ -1,0 +1,109 @@
+{
+ "id": "libres",
+ "tipo": "serie",
+ "bounds": {
+  "west": -57.25,
+  "south": -29.85,
+  "east": -56.95,
+  "north": -29.55
+ },
+ "fechas": [
+  "20260626",
+  "20260708",
+  "20260720",
+  "20260813",
+  "20260825",
+  "20260906",
+  "20260918",
+  "20260930",
+  "20261012"
+ ],
+ "fechas_texto": [
+  "26 de junio de 2026",
+  "8 de julio de 2026",
+  "20 de julio de 2026",
+  "13 de agosto de 2026",
+  "25 de agosto de 2026",
+  "6 de septiembre de 2026",
+  "18 de septiembre de 2026",
+  "30 de septiembre de 2026",
+  "12 de octubre de 2026"
+ ],
+ "fecha_referencia": "26 de junio de 2026",
+ "satelite": "NISAR (NASA-ISRO), radar banda L, producto GCOV PROVISIONAL (HH+HV, 20 m)",
+ "pares": "Órbita 010 descendente, frame 103: 9 pasadas",
+ "camara": {
+  "lon": -57.1,
+  "lat": -29.700000000000003,
+  "radio_m": 15000,
+  "distancia_m": 48000
+ },
+ "inicio": {
+  "capa": "ojos",
+  "fecha": "20261012"
+ },
+ "nombre": "Crecida del río Uruguay",
+ "lugar": "Paso de los Libres (Argentina) y Uruguaiana (Brasil)",
+ "estado": "Indicio fuerte",
+ "color": "amarillo",
+ "titular": "El río Uruguay salió de su cauce y NISAR lo vio con el cielo cubierto",
+ "que_es": "Estas son las pasadas reales del radar NISAR entre junio y octubre de 2026, una cada 12 días. Mové la línea de tiempo: el 12 de octubre aparecen manchas negras nuevas junto al río.",
+ "estado_detalle": "En las zonas que NISAR marcó como posible agua nueva (celeste), el mapa de agua de NASA hecho con otro radar (Sentinel-1, 8 de octubre) pasó de 1 % a 53 % de agua; en las zonas sin cambio, de 0,3 % a 1,1 %. Es un indicio y no una validación: con una fecha sin crecida, la misma regla también marcó campos arados, apenas por encima de lo que habíamos fijado como tolerable (0,37 contra 0,33).",
+ "resultado": "src/agua_crecida_uruguay.py (calibración relativa entre fechas): MARCADO = caída de HV ≥ 3 dB entre la referencia (25-ago y 6-sep) y el 12-oct, en celdas de 100 m. A1 1,1 % → 53,0 % (DSWx-S1, 8-oct), A2 0,3 % → 1,1 %, A3 2.114/5.765 = 0,367 (> 0,333: no pasa), A4 5.765 celdas.",
+ "evento": "Crecida del río Uruguay, octubre de 2026 (alturas INA/CARU por encima del nivel de evacuación en Paso de los Libres)",
+ "limites": [
+  "Es un indicio, no una validación: el control temporal no pasó por poco.",
+  "El radar ve agua abierta; el agua debajo del monte de la costa puede no verse.",
+  "No mide la altura del río: ve dónde hay agua, no cuántos metros subió.",
+  "Entre una fecha y otra también cambia el color del campo (humedad, cosechas): eso no es agua."
+ ],
+ "capas": [
+  {
+   "id": "ojos",
+   "nombre": "Ojos de NISAR",
+   "archivos": [
+    "ojos_20260626.png",
+    "ojos_20260708.png",
+    "ojos_20260720.png",
+    "ojos_20260813.png",
+    "ojos_20260825.png",
+    "ojos_20260906.png",
+    "ojos_20260918.png",
+    "ojos_20260930.png",
+    "ojos_20261012.png"
+   ],
+   "leyenda": {
+    "titulo": "Los ojos de NISAR: el eco del radar (colores falsos)",
+    "gradiente": "linear-gradient(90deg,#000 0%,#000 18%,#6b7d1e 40%,#c8e06a 62%,#e9b7d6 85%,#fff 100%)",
+    "izq": "sin eco (agua)",
+    "der": "mucho eco",
+    "palabras": "<b>Negro</b>: agua quieta, que hace de espejo.<br><b>Verde-amarillo</b>: vegetación.<br><b>Rosado o blanco</b>: ciudad y construcciones.<br>Es la imagen real del radar, no una foto: no tiene nubes."
+   },
+   "texto_fecha": "{f}: así vio el radar este lugar ese día. Negro = agua."
+  },
+  {
+   "id": "marcado",
+   "nombre": "Agua nueva (12-oct)",
+   "archivos": [
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "marcado_20261012.png"
+   ],
+   "sobre": "ojos",
+   "texto_fecha": "{f}: en celeste, las zonas donde NISAR vio el eco apagarse fuerte respecto de fines de agosto (solo se calcula para el 12 de octubre).",
+   "leyenda": {
+    "titulo": "Posible agua nueva según NISAR (12 de octubre)",
+    "gradiente": "linear-gradient(90deg,#40a8ff,#40a8ff)",
+    "izq": "",
+    "der": "",
+    "palabras": "<b style='color:#40a8ff'>Celeste</b>: el eco del radar se apagó fuerte (3 dB o más) respecto de fines de agosto. El mapa de agua de NASA confirma agua en la mitad de estas zonas; el resto incluye campos arados."
+   }
+  }
+ ]
+}
