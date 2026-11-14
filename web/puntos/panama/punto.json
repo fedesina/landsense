@@ -1,0 +1,249 @@
+{
+ "id": "panama",
+ "nombre": "Terremoto de Panamá",
+ "lugar": "Península de Azuero, Panamá",
+ "tipo": "antes_despues",
+ "titular": "NISAR vio el suelo romperse a lo largo de la falla en la península de Azuero",
+ "que_es": "Este mapa no es una foto: compara dos pasadas del radar NISAR, una antes y otra después del sismo, y muestra cuánto se acercó o se alejó cada punto del suelo respecto del satélite. Lo vieron dos órbitas distintas y, junto a la falla, coinciden.",
+ "fecha_antes": "2 de octubre de 2026",
+ "fecha_despues": "14 de octubre de 2026",
+ "evento": "Sismo M7,7 del 9 de octubre de 2026 (y réplicas M6,6 el mismo día, M6,0 el 10 y M6,1 el 12), falla lateral izquierda según USGS",
+ "satelite": "NISAR (NASA-ISRO), banda L, productos GUNW provisionales",
+ "pares": "Descendente 040 (2 oct - 14 oct, frame 085) y descendente 141 (27 sep - 9 oct, frames 084 y 085 unidos restando su corrimiento de 75 cm; lo que sobra: 4 cm)",
+ "estado": "Visto: coincide con USGS",
+ "color": "amarillo",
+ "estado_detalle": "Dos órbitas descendentes distintas ven la misma forma junto a la falla (r = 0,99). El sentido del movimiento (lateral izquierdo) y la dirección de la falla (~281° medido vs 288° de USGS) coinciden con el análisis sísmico de USGS. No damos cuánto se movió hacia el oeste ni hacia arriba: la única pasada ascendente tiene errores de procesamiento.",
+ "resultado": "src/sismo_generico.py: C1 PASA (141 D 5,7-12×, 040 D 15,4×), C2 PASA (040 D vs 141 D r = 0,99 / 1,00), C3 NO CONFIABLE (076 A con saltos de λ/2 = 12,1 cm: 22,6 por 10.000 vecinos vs 0,3-1,0 en las descendentes). C4: bloque norte al oeste = lateral izquierdo; rumbo de la traza ≈ 281° (USGS: tensor 288°, falla finita 275-295°).",
+ "limites": [
+  "Mide solo en la línea de vista del satélite: rojo puede ser hacia el oeste o hacia arriba; sin una segunda geometría buena no se separa.",
+  "La pasada ascendente (076 A) tiene errores de procesamiento (saltos de media longitud de onda) y no se usa.",
+  "Cerca de la falla el suelo se movió más de un metro y la imagen se satura; justo sobre la falla no hay dato (el radar pierde coherencia).",
+  "La pasada 040 D incluye también las réplicas del 10 y 12 de octubre: muestra la suma de todos los movimientos.",
+  "Lejos de la falla las dos órbitas no coinciden del todo (hasta ~50 cm de diferencia en 45 km). Puede ser la ionosfera, fuerte cerca del ecuador de noche (sin verificar). Lo firme es el salto junto a la falla, no los valores a decenas de km.",
+  "Valores relativos dentro de la imagen; no se predicen sismos: se mide lo que ya ocurrió."
+ ],
+ "bounds": {
+  "west": -81.31480014983092,
+  "east": -80.22360014983346,
+  "north": 8.12790038054668,
+  "south": 7.203100380546783
+ },
+ "escala_cm": 100.0,
+ "capas": [
+  {
+   "id": "los_040D",
+   "nombre": "Órbita 040 (2 de octubre → 14 de octubre)",
+   "izquierda": "se alejó",
+   "derecha": "se acercó",
+   "texto_izq": "el suelo se alejó del satélite",
+   "texto_der": "el suelo se acercó al satélite (hacia el oeste o hacia arriba)",
+   "texto_neutro": "blanco: casi no se movió",
+   "archivo": "los_040D.png",
+   "validos": 497031,
+   "p1": -34.4,
+   "p99": 149.4,
+   "sismos": "M7,7, M6,6, M6,0 y M6,1"
+  },
+  {
+   "id": "los_141D",
+   "nombre": "Órbita 141 (27 de septiembre → 9 de octubre)",
+   "izquierda": "se alejó",
+   "derecha": "se acercó",
+   "texto_izq": "el suelo se alejó del satélite",
+   "texto_der": "el suelo se acercó al satélite (hacia el oeste o hacia arriba)",
+   "texto_neutro": "blanco: casi no se movió",
+   "archivo": "los_141D.png",
+   "validos": 456299,
+   "p1": -88.8,
+   "p99": 155.5,
+   "sismos": "M7,7 y M6,6"
+  }
+ ],
+ "camara": {
+  "lon": -80.75,
+  "lat": 7.55,
+  "radio_m": 45000,
+  "distancia_m": 150000
+ },
+ "epicentros": [
+  {
+   "id": "us6000u18k",
+   "mag": 7.7,
+   "lugar": "12 km WSW of Pitaloza Arriba, Panama",
+   "lon": -80.769,
+   "lat": 7.5868,
+   "prof_km": 12.647,
+   "dentro": true
+  },
+  {
+   "id": "us6000u19w",
+   "mag": 6.6,
+   "lugar": "12 km W of Río Grande, Panama",
+   "lon": -81.444,
+   "lat": 7.7013,
+   "prof_km": 24.044,
+   "dentro": false
+  },
+  {
+   "id": "us6000u1cf",
+   "mag": 6,
+   "lugar": "7 km N of La Tronosa, Panama",
+   "lon": -80.5985,
+   "lat": 7.5068,
+   "prof_km": 10,
+   "dentro": true
+  },
+  {
+   "id": "us6000u1wn",
+   "mag": 6.1,
+   "lugar": "15 km W of Río Grande, Panama",
+   "lon": -81.4715,
+   "lat": 7.7098,
+   "prof_km": 11,
+   "dentro": false
+  }
+ ],
+ "falla": {
+  "nombre": "Falla (modelo USGS, trazo aproximado)",
+  "puntos": [
+   [
+    -81.387,
+    7.614
+   ],
+   [
+    -81.342,
+    7.61
+   ],
+   [
+    -81.296,
+    7.606
+   ],
+   [
+    -81.251,
+    7.602
+   ],
+   [
+    -81.206,
+    7.598
+   ],
+   [
+    -81.161,
+    7.594
+   ],
+   [
+    -81.116,
+    7.59
+   ],
+   [
+    -81.07,
+    7.586
+   ],
+   [
+    -81.065,
+    7.604
+   ],
+   [
+    -81.025,
+    7.582
+   ],
+   [
+    -81.023,
+    7.585
+   ],
+   [
+    -80.982,
+    7.566
+   ],
+   [
+    -80.941,
+    7.547
+   ],
+   [
+    -80.9,
+    7.527
+   ],
+   [
+    -80.9,
+    7.528
+   ],
+   [
+    -80.859,
+    7.508
+   ],
+   [
+    -80.818,
+    7.489
+   ],
+   [
+    -80.777,
+    7.471
+   ],
+   [
+    -80.736,
+    7.452
+   ],
+   [
+    -80.694,
+    7.433
+   ],
+   [
+    -80.653,
+    7.413
+   ],
+   [
+    -80.612,
+    7.394
+   ],
+   [
+    -80.639,
+    7.47
+   ],
+   [
+    -80.598,
+    7.45
+   ],
+   [
+    -80.556,
+    7.431
+   ],
+   [
+    -80.515,
+    7.412
+   ],
+   [
+    -80.474,
+    7.394
+   ],
+   [
+    -80.433,
+    7.374
+   ],
+   [
+    -80.433,
+    7.375
+   ],
+   [
+    -80.392,
+    7.355
+   ],
+   [
+    -80.351,
+    7.336
+   ],
+   [
+    -80.31,
+    7.317
+   ],
+   [
+    -80.269,
+    7.298
+   ],
+   [
+    -80.228,
+    7.279
+   ]
+  ],
+  "fuente": "Falla: borde superior del modelo de falla finita del USGS para us6000u18k (versión 3).",
+  "nota": "Borde superior del plano del modelo de falla finita; no es el trazo exacto en superficie. Ese modelo usó también datos de radar, así que no es una comparación independiente."
+ }
+}

@@ -1,0 +1,24 @@
+# Dependencias de LandSense (NASA Space Apps 2026)
+# Python 3.11
+# Instalar:  python -m pip install -r requirements.txt
+
+# --- Datos satelitales ---
+itslive          # velocidad de hielo ITS_LIVE (NASA/JPL), abierto
+earthaccess      # login Earthdata + streaming NISAR desde S3 (sin bajar GB)
+asf_search       # buscar/descargar productos NISAR desde ASF
+
+# --- Lectura de archivos ---
+h5py             # abrir NISAR (HDF5)
+h5netcdf         # leer NISAR con xarray
+xarray           # datos multidimensionales
+rasterio         # leer raster de poblacion (WorldPop)
+
+# --- Cálculo y geo ---
+numpy
+pandas
+scipy            # filtros (mediana, limpieza de ruido)
+pyproj           # reproyectar coordenadas (lat/lon <-> UTM)
+
+# --- Red y gráficos ---
+requests         # bajar recorte de poblacion (ImageServer WorldPop)
+matplotlib

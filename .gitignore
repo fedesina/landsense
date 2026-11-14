@@ -1,0 +1,12 @@
+# Claves y credenciales: nunca al repo
+web/config.js
+.env
+*.env
+.netrc
+
+# Salidas locales de los scripts (se regeneran)
+data/
+
+# Python
+__pycache__/
+*.pyc

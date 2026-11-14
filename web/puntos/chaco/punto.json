@@ -1,0 +1,110 @@
+{
+ "id": "chaco",
+ "tipo": "serie",
+ "bounds": {
+  "west": -59.05,
+  "south": -27.6,
+  "east": -58.55,
+  "north": -27.0
+ },
+ "fechas": [
+  "20260621",
+  "20260703",
+  "20260715",
+  "20260820",
+  "20260901",
+  "20260913",
+  "20260925",
+  "20261007",
+  "20261019"
+ ],
+ "fechas_texto": [
+  "21 de junio de 2026",
+  "3 de julio de 2026",
+  "15 de julio de 2026",
+  "20 de agosto de 2026",
+  "1 de septiembre de 2026",
+  "13 de septiembre de 2026",
+  "25 de septiembre de 2026",
+  "7 de octubre de 2026",
+  "19 de octubre de 2026"
+ ],
+ "fecha_referencia": "21 de junio de 2026",
+ "satelite": "NISAR (NASA-ISRO), radar banda L, producto GCOV PROVISIONAL (HH+HV, 20 m)",
+ "pares": "Órbita 111 descendente, frame 102: 9 pasadas",
+ "camara": {
+  "lon": -58.8,
+  "lat": -27.3,
+  "radio_m": 15000,
+  "distancia_m": 48000
+ },
+ "inicio": {
+  "capa": "ojos",
+  "fecha": "20261019"
+ },
+ "nombre": "Crecida del Paraná y el Paraguay en Chaco",
+ "lugar": "Gran Resistencia: Isla del Cerrito, Barranqueras y Puerto Vilelas (Chaco, Argentina)",
+ "estado": "VALIDADO",
+ "color": "verde",
+ "titular": "Durante El Niño, las lluvias hicieron crecer el Paraná y el Paraguay, y NISAR vio el agua entrar en las islas aunque estuviera nublado",
+ "que_es": "Estas son las pasadas reales del radar NISAR entre junio y octubre de 2026, una cada 12 días. Mové la línea de tiempo: hasta el 7 de octubre las islas se ven verdes; el 19 de octubre, con el río a unos 7 metros en Barranqueras, los bajos de las islas se llenan de negro (agua).",
+ "estado_detalle": "Hicimos la prueba a ciegas: fijamos la regla antes de mirar los datos. Dos pasadas distintas de NISAR (16 y 19 de octubre, desde dos órbitas) marcaron agua nueva, y el mapa de agua de NASA hecho con fotos de otros satélites lo confirma: en las zonas marcadas el agua pasó de 13 % (agosto) a 87 % (19 de octubre); en las zonas sin cambio, de 7 % a 8 %. Además, las dos pasadas coinciden: el 97 % de lo que NISAR marcó el 16 de octubre lo volvió a marcar el 19.",
+ "resultado": "src/agua_crecida_chaco.py (misma receta que src/agua_crecida_uruguay.py): MARCADO = caída de HV ≥ 3 dB respecto de la referencia, celdas de 100 m. 111 D (ref 20-ago + 1-sep, evento 19-oct): DSWx-HLS 13,0 % → 87,4 % en marcado, 6,6 % → 7,9 % en control, control temporal 496/16.181. 060 A (ref 17-ago + 29-ago, evento 16-oct): 26,4 % → 79,5 % y 10,0 % → 12,0 %, control temporal 752/7.898.",
+ "evento": "Crecida de los ríos Paraná y Paraguay, octubre de 2026, durante El Niño (lluvias intensas en la cuenca). Paraná en Barranqueras: 5,40 m el 14-oct y 7,16 m el 20-oct (evacuación desde 6,50 m, Prefectura). Chaco informó 913 personas trasladadas y 281 autoevacuadas (21-oct).",
+ "limites": [
+  "Decimos 'durante El Niño', no 'por El Niño': NISAR ve el agua, no la causa.",
+  "NISAR mide en celdas de 100 m: ve islas y bañados inundados, no una calle o una casa.",
+  "La confirmación sale de fotos satelitales (DSWx-HLS) con una sola fecha despejada antes de la crecida (23 de agosto); el mapa de NASA hecho con otro radar (Sentinel-1) no alcanzó a cubrir la zona en las fechas del pico.",
+  "El agua debajo del monte o de pastizales altos puede no verse.",
+  "Algunas manchas celestes al norte (cerca de Las Palmas) caen sobre arroceras con riego: ahí el agua es del cultivo, no de la crecida."
+ ],
+ "capas": [
+  {
+   "id": "ojos",
+   "nombre": "Ojos de NISAR",
+   "archivos": [
+    "ojos_20260621.png",
+    "ojos_20260703.png",
+    "ojos_20260715.png",
+    "ojos_20260820.png",
+    "ojos_20260901.png",
+    "ojos_20260913.png",
+    "ojos_20260925.png",
+    "ojos_20261007.png",
+    "ojos_20261019.png"
+   ],
+   "leyenda": {
+    "titulo": "Los ojos de NISAR: el eco del radar (colores falsos)",
+    "gradiente": "linear-gradient(90deg,#000 0%,#000 18%,#6b7d1e 40%,#c8e06a 62%,#e9b7d6 85%,#fff 100%)",
+    "izq": "sin eco (agua)",
+    "der": "mucho eco",
+    "palabras": "<b>Negro</b>: agua quieta, que hace de espejo.<br><b>Verde-amarillo</b>: vegetación.<br><b>Rosado o blanco</b>: ciudad y construcciones.<br>Es la imagen real del radar, no una foto: no tiene nubes."
+   },
+   "texto_fecha": "{f}: así vio el radar este lugar ese día. Negro = agua."
+  },
+  {
+   "id": "marcado",
+   "nombre": "Agua nueva (19-oct)",
+   "archivos": [
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "vacio.png",
+    "marcado_20261019.png"
+   ],
+   "sobre": "ojos",
+   "texto_fecha": "{f}: en celeste, las zonas donde NISAR vio el eco apagarse fuerte respecto de fines de agosto (solo se calcula para el 19 de octubre).",
+   "leyenda": {
+    "titulo": "Agua nueva según NISAR (19 de octubre)",
+    "gradiente": "linear-gradient(90deg,#40a8ff,#40a8ff)",
+    "izq": "",
+    "der": "",
+    "palabras": "<b style='color:#40a8ff'>Celeste</b>: el eco del radar se apagó fuerte (3 dB o más) respecto de fines de agosto. Las fotos satelitales de NASA confirman agua en el 87 % de estas zonas."
+   }
+  }
+ ]
+}

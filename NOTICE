@@ -1,0 +1,11 @@
+LandSense
+Copyright 2026 Team LandSense (Argentina)
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It uses third-party data and software that keep their own licenses and terms.
+They are listed, with attribution, in the "Data sources and credits" section
+of README.md. In particular:
+- Field-validated damage points for La Guaira (Venezuela) by the Humanitarian
+  OpenStreetMap Team (HOT), published on HDX under CC BY-NC-SA 4.0.
+- CesiumJS (Apache License 2.0) and Cesium ion services (Cesium ion terms of use).
