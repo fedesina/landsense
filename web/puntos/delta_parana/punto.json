@@ -49,13 +49,13 @@
    "id": "eco",
    "nombre": "Qué ve el radar",
    "archivos": [
-    "eco_20260626.png",
-    "eco_20260708.png",
-    "eco_20260720.png",
-    "eco_20260813.png",
-    "eco_20260825.png",
-    "eco_20260906.png",
-    "eco_20260918.png"
+    "eco_20260626.webp",
+    "eco_20260708.webp",
+    "eco_20260720.webp",
+    "eco_20260813.webp",
+    "eco_20260825.webp",
+    "eco_20260906.webp",
+    "eco_20260918.webp"
    ],
    "leyenda": {
     "titulo": "Eco del radar (colores falsos, estilo NISAR)",
@@ -69,13 +69,13 @@
    "id": "cambio",
    "nombre": "Qué cambió",
    "archivos": [
-    "cambio_20260626.png",
-    "cambio_20260708.png",
-    "cambio_20260720.png",
-    "cambio_20260813.png",
-    "cambio_20260825.png",
-    "cambio_20260906.png",
-    "cambio_20260918.png"
+    "cambio_20260626.webp",
+    "cambio_20260708.webp",
+    "cambio_20260720.webp",
+    "cambio_20260813.webp",
+    "cambio_20260825.webp",
+    "cambio_20260906.webp",
+    "cambio_20260918.webp"
    ],
    "leyenda": {
     "titulo": "Dónde cambió fuerte el eco (respecto de fines de junio y julio)",

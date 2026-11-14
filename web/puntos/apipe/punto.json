@@ -60,15 +60,15 @@
    "id": "ojos",
    "nombre": "Ojos de NISAR",
    "archivos": [
-    "ojos_20260626.png",
-    "ojos_20260708.png",
-    "ojos_20260720.png",
-    "ojos_20260813.png",
-    "ojos_20260825.png",
-    "ojos_20260906.png",
-    "ojos_20260918.png",
-    "ojos_20260930.png",
-    "ojos_20261012.png"
+    "ojos_20260626.webp",
+    "ojos_20260708.webp",
+    "ojos_20260720.webp",
+    "ojos_20260813.webp",
+    "ojos_20260825.webp",
+    "ojos_20260906.webp",
+    "ojos_20260918.webp",
+    "ojos_20260930.webp",
+    "ojos_20261012.webp"
    ],
    "leyenda": {
     "titulo": "Los ojos de NISAR: el eco del radar (colores falsos)",

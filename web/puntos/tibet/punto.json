@@ -38,7 +38,7 @@
    "texto_izq": "el suelo se alejó del satélite (hacia el oeste o hacia abajo)",
    "texto_der": "el suelo se acercó al satélite (hacia el este o hacia arriba)",
    "texto_neutro": "blanco: casi no se movió",
-   "archivo": "los_112A.png",
+   "archivo": "los_112A.webp",
    "validos": 1004431,
    "p1": -70.4,
    "p99": 27.0
@@ -51,7 +51,7 @@
    "texto_izq": "el suelo se alejó del satélite (hacia el oeste o hacia abajo)",
    "texto_der": "el suelo se acercó al satélite (hacia el este o hacia arriba)",
    "texto_neutro": "blanco: casi no se movió",
-   "archivo": "los_040A.png",
+   "archivo": "los_040A.webp",
    "validos": 202332,
    "p1": -9.5,
    "p99": 12.0

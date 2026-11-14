@@ -35,7 +35,7 @@
    "texto_izq": "el suelo se movió hacia el oeste",
    "texto_der": "el suelo se movió hacia el este",
    "texto_neutro": "blanco: casi no se movió",
-   "archivo": "este_oeste.png",
+   "archivo": "este_oeste.webp",
    "validos": 313802,
    "p1": -85.3,
    "p99": 12.9
@@ -48,7 +48,7 @@
    "texto_izq": "el suelo bajó",
    "texto_der": "el suelo subió",
    "texto_neutro": "blanco: casi no subió ni bajó",
-   "archivo": "vertical.png",
+   "archivo": "vertical.webp",
    "validos": 313802,
    "p1": -7.6,
    "p99": 5.4
@@ -57,8 +57,8 @@
    "id": "ojos",
    "nombre": "Ojos de NISAR",
    "momentos": {
-    "antes": "ojos_20260622.png",
-    "despues": "ojos_20260704.png"
+    "antes": "ojos_20260622.webp",
+    "despues": "ojos_20260704.webp"
    },
    "leyenda": {
     "titulo": "Los ojos de NISAR: el eco del radar (colores falsos)",
@@ -661,7 +661,7 @@
   "nota": "Solo dirección este-oeste (se supone norte-sur nulo). Largo exagerado: 1 cm de movimiento = 50 m de flecha. Solo se dibujan movimientos mayores a 13 cm, que es cuánto varía la zona de referencia."
  },
  "poblacion": {
-  "archivo": "poblacion.png",
+  "archivo": "poblacion.webp",
   "bounds": {
    "west": -67.24166639769412,
    "east": -66.49999973399417,
@@ -689,7 +689,7 @@
   ]
  },
  "danio": {
-  "archivo": "danio_zonas.png",
+  "archivo": "danio_zonas.webp",
   "bounds": {
    "west": -67.13,
    "east": -66.689,
