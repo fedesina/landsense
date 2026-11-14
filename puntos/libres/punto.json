@@ -105,5 +105,31 @@
     "palabras": "<b style='color:#40a8ff'>Celeste</b>: el eco del radar se apagó fuerte (3 dB o más) respecto de fines de agosto. El mapa de agua de NASA confirma agua en la mitad de estas zonas; el resto incluye campos arados."
    }
   }
- ]
+ ],
+ "_en": {
+  ".satelite": "NISAR (NASA-ISRO), L-band radar, PROVISIONAL GCOV product (HH+HV, 20 m)",
+  ".pares": "Orbit 010 descending, frame 103: 9 passes",
+  ".nombre": "Uruguay River flood",
+  ".lugar": "Paso de los Libres (Argentina) and Uruguaiana (Brazil)",
+  ".estado": "Strong indication",
+  ".titular": "The Uruguay River left its banks and NISAR saw it under full cloud cover",
+  ".que_es": "These are the real NISAR radar passes between June and October 2026, one every 12 days. Move the timeline: on October 12 new black patches appear next to the river.",
+  ".estado_detalle": "In the areas NISAR flagged as possible new water (light blue), the NASA water map made with another radar (Sentinel-1, October 8) went from 1% to 53% water; in the areas with no change, from 0.3% to 1.1%. It is an indication, not a validation: on a date with no flood, the same rule also flagged plowed fields, just above what we had set as tolerable (0.37 versus 0.33).",
+  ".resultado": "src/agua_crecida_uruguay.py (relative calibration between dates): FLAGGED = HV drop ≥ 3 dB between the reference (Aug 25 and Sep 6) and Oct 12, in 100 m cells. A1 1.1% → 53.0% (DSWx-S1, Oct 8), A2 0.3% → 1.1%, A3 2,114/5,765 = 0.367 (> 0.333: fails), A4 5,765 cells.",
+  ".evento": "Uruguay River flood, October 2026 (INA/CARU river levels above the evacuation level at Paso de los Libres)",
+  ".limites[0]": "It is an indication, not a validation: the temporal control narrowly failed.",
+  ".limites[1]": "The radar sees open water; water under the riverside forest may not be visible.",
+  ".limites[2]": "It does not measure the river level: it sees where there is water, not how many meters it rose.",
+  ".limites[3]": "Between one date and another the color of the fields also changes (moisture, harvests): that is not water.",
+  ".capas[0].nombre": "NISAR's eyes",
+  ".capas[0].leyenda.titulo": "NISAR's eyes: the radar echo (false colors)",
+  ".capas[0].leyenda.izq": "no echo (water)",
+  ".capas[0].leyenda.der": "strong echo",
+  ".capas[0].leyenda.palabras": "<b>Black</b>: still water, which acts as a mirror.<br><b>Yellow-green</b>: vegetation.<br><b>Pink or white</b>: towns and buildings.<br>This is the real radar image, not a photo: it has no clouds.",
+  ".capas[0].texto_fecha": "{f}: how the radar saw this place that day. Black = water.",
+  ".capas[1].nombre": "New water (Oct 12)",
+  ".capas[1].texto_fecha": "{f}: in light blue, the areas where NISAR saw the echo drop sharply compared with late August (only computed for October 12).",
+  ".capas[1].leyenda.titulo": "Possible new water according to NISAR (October 12)",
+  ".capas[1].leyenda.palabras": "<b style='color:#40a8ff'>Light blue</b>: the radar echo dropped sharply (3 dB or more) compared with late August. The NASA water map confirms water in half of these areas; the rest includes plowed fields."
+ }
 }

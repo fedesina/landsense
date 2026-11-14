@@ -79,5 +79,25 @@
    },
    "texto_fecha": "{f}: así vio el radar este lugar ese día. Negro = agua."
   }
- ]
+ ],
+ "_en": {
+  ".satelite": "NISAR (NASA-ISRO), L-band radar, PROVISIONAL GCOV product (HH+HV, 20 m)",
+  ".pares": "Orbit 010 descending, frame 102: 9 passes",
+  ".nombre": "Yacyretá and Apipé island",
+  ".lugar": "Paraná River, Corrientes (Argentina) and Paraguay",
+  ".estado": "Image only, not analyzed",
+  ".titular": "The Yacyretá dam and Apipé island, as seen by the radar",
+  ".que_es": "Real NISAR radar passes between June and October 2026. You can see the dam, the reservoir and the branches of the Paraná. The river was rising and was expected to reach the evacuation level around October 20.",
+  ".estado_detalle": "We only show the radar image: we have not yet done the analysis with independent confirmation. This is the area we will follow when the Paraná reaches its peak.",
+  ".resultado": "Composite from src/radar_imagenes.py: R = HH, G = HV, B = HH/HV × brightness; fixed scale on every date.",
+  ".evento": "Paraná River flood, October 2026 (ongoing)",
+  ".limites[0]": "It is only the radar image: it does not claim there is new water.",
+  ".limites[1]": "Between dates the color of the fields changes (moisture, crops): that is not water.",
+  ".capas[0].nombre": "NISAR's eyes",
+  ".capas[0].leyenda.titulo": "NISAR's eyes: the radar echo (false colors)",
+  ".capas[0].leyenda.izq": "no echo (water)",
+  ".capas[0].leyenda.der": "strong echo",
+  ".capas[0].leyenda.palabras": "<b>Black</b>: still water, which acts as a mirror.<br><b>Yellow-green</b>: vegetation.<br><b>Pink or white</b>: towns and buildings.<br>This is the real radar image, not a photo: it has no clouds.",
+  ".capas[0].texto_fecha": "{f}: how the radar saw this place that day. Black = water."
+ }
 }
