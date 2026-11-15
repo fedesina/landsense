@@ -8,6 +8,16 @@ Built for the **NASA Space Apps Challenge 2026**, challenge *Dancing with the SA
 
 **Live app:** https://fedesina.github.io/landsense/
 
+![LandSense home screen: the 56 cm headline and the globe of earthquakes and floods](assets/screenshots/home.jpg)
+
+| Venezuela earthquake: which way the ground moved | Chaco flood: new water flagged by NISAR |
+|---|---|
+| ![Guided tour step with arrows showing westward ground motion near Maiquetía airport](assets/screenshots/venezuela-tour.jpg) | ![Explore mode with the Chaco flood scene and the new-water layer](assets/screenshots/chaco-flood.jpg) |
+
+| Kids' version: NISAR tells its own story |  |
+|---|---|
+| ![Kids' version with the NISAR character explaining tectonic plates](assets/screenshots/kids-version.jpg) | Every screen is real NISAR data. The app runs in any browser, on desktop and mobile, in English (`?lang=en`) and Spanish. |
+
 ---
 
 ## What is in this repository
