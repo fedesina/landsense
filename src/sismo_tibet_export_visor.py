@@ -14,6 +14,7 @@ Requiere internet (epicentro y falla finita del USGS en vivo, como src/sismo_pan
 Uso:  python src/sismo_tibet_export_visor.py
 """
 import os, json
+from visor_json import guardar_punto
 import requests
 import numpy as np
 import matplotlib
@@ -138,7 +139,7 @@ P = dict(
 )
 if falla:
     P["falla"] = falla
-json.dump(P, open(os.path.join(SALIDA, "punto.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+guardar_punto(os.path.join(SALIDA, "punto.json"), P)
 ij = os.path.join(WEB, "index.json"); I = json.load(open(ij, encoding="utf-8"))
 if "tibet" not in I["puntos"]:
     I["puntos"].append("tibet"); json.dump(I, open(ij, "w", encoding="utf-8"), ensure_ascii=False, indent=1)

@@ -21,6 +21,7 @@ Uso:
     python src/sismo_la_guaira_export_visor.py
 """
 import os, json
+from visor_json import guardar_punto
 import requests
 import numpy as np
 import matplotlib
@@ -181,6 +182,6 @@ punto = {
                           "1 cm de movimiento = 50 m de flecha. Solo se dibujan movimientos mayores a "
                           f"{MIN_CM:.0f} cm, que es cuánto varía la zona de referencia.")),
 }
-json.dump(punto, open(os.path.join(SALIDA, "punto.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+guardar_punto(os.path.join(SALIDA, "punto.json"), punto)
 print("bounds:", bounds)
 print("Listo:", os.path.abspath(SALIDA))

@@ -18,6 +18,7 @@ Requiere para 'libres': data/processed/crecida/uruguay/libres_010D_103.npz (src/
 Despues: Ctrl+F5 en el visor (Live Server).
 """
 import os, re, sys, json, time
+from visor_json import guardar_punto
 from collections import defaultdict
 import numpy as np
 
@@ -251,7 +252,7 @@ def escribir_punto(zona, k, fechas, b, od, extra):
     p.update(extra)
     p["capas"] = [dict(id="ojos", nombre="Ojos de NISAR", archivos=[f"ojos_{f}.png" for f in fechas], leyenda=LEYENDA_OJOS,
                        texto_fecha="{f}: así vio el radar este lugar ese día. Negro = agua.")] + p.get("capas", [])
-    json.dump(p, open(os.path.join(od, "punto.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    guardar_punto(os.path.join(od, "punto.json"), p)
     idx_p = os.path.join(WEB, "index.json"); idx = json.load(open(idx_p, encoding="utf-8"))
     if zona not in idx["puntos"]:
         idx["puntos"].append(zona); json.dump(idx, open(idx_p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)

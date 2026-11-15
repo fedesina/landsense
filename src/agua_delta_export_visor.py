@@ -19,6 +19,7 @@ Uso:
     python src/agua_delta_export_visor.py
 """
 import os, json
+from visor_json import guardar_punto
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -182,7 +183,7 @@ punto = dict(
     marcadores=[],
     grafico=grafico,
 )
-json.dump(punto, open(os.path.join(SAL, "punto.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+guardar_punto(os.path.join(SAL, "punto.json"), punto)
 
 idx_path = os.path.join(WEB, "index.json")
 idx = json.load(open(idx_path, encoding="utf-8")) if os.path.exists(idx_path) else {"puntos": []}

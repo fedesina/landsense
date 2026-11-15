@@ -11,6 +11,7 @@ Requiere internet (epicentros y falla finita del USGS en vivo, como src/sismo_la
 Uso:  python src/sismo_panama_export_visor.py
 """
 import os, json
+from visor_json import guardar_punto
 import requests
 import numpy as np
 import matplotlib
@@ -138,7 +139,7 @@ P = dict(
                fuente=f"Falla: borde superior del modelo de falla finita del USGS para us6000u18k (versión {ff['properties'].get('version')}).",
                nota="Borde superior del plano del modelo de falla finita; no es el trazo exacto en superficie. Ese modelo usó también datos de radar, así que no es una comparación independiente."),
 )
-json.dump(P, open(os.path.join(SALIDA, "punto.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+guardar_punto(os.path.join(SALIDA, "punto.json"), P)
 ij = os.path.join(WEB, "index.json"); I = json.load(open(ij, encoding="utf-8"))
 if "panama" not in I["puntos"]:
     I["puntos"].append("panama"); json.dump(I, open(ij, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
